@@ -14,6 +14,9 @@ importers:
       '@colyseus/playground':
         specifier: ^0.16.0
         version: 0.16.4(@colyseus/auth@0.16.6(@colyseus/core@0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0))(express@4.22.1))(@colyseus/core@0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0))(express@4.22.1)
+      '@colyseus/schema':
+        specifier: ^3.0.76
+        version: 3.0.76
       '@colyseus/tools':
         specifier: ^0.16.0
         version: 0.16.18(@colyseus/core@0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0))(@colyseus/ws-transport@0.16.5(@colyseus/core@0.16.24(@colyseus/schema@3.0.76)(@pm2/io@6.1.0)))
