@@ -442,4 +442,172 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.winner, client2.sessionId);
     });
   });
+
+  describe("Round Management Tests", () => {
+    it("single mode ends after 1 win", async function () {
+      this.timeout(10000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 1);
+    });
+
+    it("best_of_3 mode ends after 2 wins", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "best_of_3" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.roundNumber, 2);
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 2);
+    });
+
+    it("choices are reset between rounds", async function () {
+      this.timeout(10000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "best_of_3" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+
+      const p1 = room.state.players.get(client1.sessionId);
+      const p2 = room.state.players.get(client2.sessionId);
+
+      assert.strictEqual(p1?.choice, "");
+      assert.strictEqual(p2?.choice, "");
+    });
+  });
+
+  describe("Integration Tests", () => {
+    it("full game flow: join → mode_select → choosing → result → finished (single mode)", async function () {
+      this.timeout(10000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+
+      assert.strictEqual(room.state.gameStatus, "waiting");
+
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "waiting");
+      assert.strictEqual(room.state.players.size, 1);
+
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+      assert.strictEqual(room.state.players.size, 2);
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.gameMode, "single");
+      assert.strictEqual(room.state.countdown, 10);
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "result");
+      assert.strictEqual(room.state.winner, client1.sessionId);
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+    });
+
+    it("best_of_5 mode requires 3 wins", async function () {
+      this.timeout(25000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "best_of_5" });
+      await room.waitForNextPatch();
+
+      for (let round = 1; round <= 3; round++) {
+        client1.send("choice", { choice: "rock" });
+        client2.send("choice", { choice: "scissors" });
+        await room.waitForNextPatch();
+
+        if (round < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          assert.strictEqual(room.state.gameStatus, "choosing");
+          assert.strictEqual(room.state.roundNumber, round + 1);
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 3);
+    });
+
+    it("draw does not count toward win condition", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.winner, "draw");
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.roundNumber, 2);
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+    });
+  });
 });
