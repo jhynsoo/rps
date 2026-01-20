@@ -117,6 +117,22 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   onLeave(client: Client, consented: boolean) {
+    const isGameInProgress =
+      this.state.gameStatus !== "waiting" && this.state.gameStatus !== "finished";
+
+    if (isGameInProgress && this.state.players.size === 2) {
+      this.stopCountdown();
+
+      const remainingPlayer = Array.from(this.state.players.values()).find(
+        (p) => p.sessionId !== client.sessionId,
+      );
+
+      if (remainingPlayer) {
+        this.state.winner = remainingPlayer.sessionId;
+        this.state.gameStatus = "finished";
+      }
+    }
+
     this.state.players.delete(client.sessionId);
   }
 

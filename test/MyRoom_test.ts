@@ -395,4 +395,51 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.gameStatus, "result");
     });
   });
+
+  describe("Disconnect Tests", () => {
+    it("opponent wins when player disconnects during game", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+    });
+
+    it("no winner assigned when player leaves during waiting", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "waiting");
+
+      await client1.leave();
+
+      assert.strictEqual(room.state.winner, "");
+    });
+
+    it("no winner assigned when player leaves during mode_select", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+    });
+  });
 });
