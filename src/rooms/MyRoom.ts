@@ -4,6 +4,12 @@ import { MyRoomState, Player } from "./schema/MyRoomState";
 const VALID_MODES = ["single", "best_of_3", "best_of_5"];
 const VALID_CHOICES = ["rock", "paper", "scissors"];
 
+const WIN_MAP: Record<string, string> = {
+  rock: "scissors",
+  scissors: "paper",
+  paper: "rock",
+};
+
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
   private firstPlayerSessionId: string = "";
@@ -45,6 +51,20 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   private determineWinner() {
+    const players = Array.from(this.state.players.values());
+    const p1 = players[0];
+    const p2 = players[1];
+
+    if (p1.choice === p2.choice) {
+      this.state.winner = "draw";
+    } else if (WIN_MAP[p1.choice] === p2.choice) {
+      this.state.winner = p1.sessionId;
+      p1.score += 1;
+    } else {
+      this.state.winner = p2.sessionId;
+      p2.score += 1;
+    }
+
     this.state.gameStatus = "result";
   }
 

@@ -253,4 +253,92 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.gameStatus, "result");
     });
   });
+
+  describe("Winner Determination Tests", () => {
+    it("rock beats scissors", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.winner, client1.sessionId);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 1);
+    });
+
+    it("scissors beats paper", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "scissors" });
+      client2.send("choice", { choice: "paper" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.winner, client1.sessionId);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 1);
+    });
+
+    it("paper beats rock", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "paper" });
+      client2.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.winner, client1.sessionId);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 1);
+    });
+
+    it("same choice is a draw", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.winner, "draw");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 0);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.score, 0);
+    });
+
+    it("gameStatus is result after determination", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "paper" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "result");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+    });
+  });
 });
