@@ -182,4 +182,75 @@ describe("testing your Colyseus app", () => {
       }
     });
   });
+
+  describe("Player Choice Tests", () => {
+    it("player can choose rock/paper/scissors during choosing state", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+
+      client1.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      const player1 = room.state.players.get(client1.sessionId);
+      assert.strictEqual(player1?.choice, "rock");
+    });
+
+    it("invalid choice is ignored", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "invalid" });
+      await room.waitForNextPatch();
+
+      const player1 = room.state.players.get(client1.sessionId);
+      assert.strictEqual(player1?.choice, "");
+    });
+
+    it("choice is ignored when not in choosing state", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      client1.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      const player1 = room.state.players.get(client1.sessionId);
+      assert.strictEqual(player1?.choice, "");
+    });
+
+    it("both players choosing triggers result calculation", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "result");
+    });
+  });
 });

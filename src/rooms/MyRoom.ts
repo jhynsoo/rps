@@ -2,6 +2,7 @@ import { type Client, Room } from "colyseus";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
 const VALID_MODES = ["single", "best_of_3", "best_of_5"];
+const VALID_CHOICES = ["rock", "paper", "scissors"];
 
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
@@ -18,6 +19,33 @@ export class MyRoom extends Room<MyRoomState> {
       this.state.gameMode = message.mode;
       this.state.gameStatus = "choosing";
     });
+
+    this.onMessage("choice", (client, message: { choice: string }) => {
+      if (this.state.gameStatus !== "choosing") return;
+      if (!VALID_CHOICES.includes(message.choice)) return;
+
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.choice !== "") return;
+
+      player.choice = message.choice;
+
+      this.checkBothPlayersChosen();
+    });
+  }
+
+  private checkBothPlayersChosen() {
+    let allChosen = true;
+    this.state.players.forEach((player) => {
+      if (player.choice === "") allChosen = false;
+    });
+
+    if (allChosen && this.state.players.size === 2) {
+      this.determineWinner();
+    }
+  }
+
+  private determineWinner() {
+    this.state.gameStatus = "result";
   }
 
   onJoin(client: Client, options: unknown) {
