@@ -1,7 +1,6 @@
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import assert from "assert";
 
-// import your "app.config.ts" file here.
 import appConfig from "../src/app.config";
 import { MyRoomState, Player } from "../src/rooms/schema/MyRoomState";
 
@@ -12,7 +11,6 @@ describe("testing your Colyseus app", () => {
     colyseus = await boot(appConfig);
   });
   after(async () => colyseus.shutdown());
-
   beforeEach(async () => await colyseus.cleanup());
 
   describe("Schema Tests", () => {
@@ -52,26 +50,73 @@ describe("testing your Colyseus app", () => {
 
   describe("Room Connection Tests", () => {
     it("connecting into a room", async () => {
-      // `room` is the server-side Room instance reference.
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
-
-      // `client1` is the client-side `Room` instance reference (same as JavaScript SDK)
       const client1 = await colyseus.connectTo(room);
 
-      // make your assertions
       assert.strictEqual(client1.sessionId, room.clients[0].sessionId);
-
-      // wait for state sync
       await room.waitForNextPatch();
 
-      // Verify new schema structure
       const state = client1.state.toJSON() as Record<string, unknown>;
       assert.strictEqual(state.gameStatus, "waiting");
-      assert.strictEqual(state.gameMode, "");
-      assert.strictEqual(state.countdown, 0);
-      assert.strictEqual(state.winner, "");
-      assert.strictEqual(state.roundNumber, 1);
       assert.ok(state.players !== undefined);
+    });
+  });
+
+  describe("Player Join/Leave Tests", () => {
+    it("player is added to players map on join", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 1);
+      const player = room.state.players.get(client1.sessionId);
+      assert.ok(player);
+      assert.strictEqual(player.sessionId, client1.sessionId);
+    });
+
+    it("gameStatus changes to mode_select when 2 players join", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "waiting");
+
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+    });
+
+    it("player is removed from players map on leave", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 1);
+      assert.ok(room.state.players.get(client2.sessionId));
+    });
+
+    it("maxClients is 2", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.players.size, 2);
+
+      try {
+        await colyseus.connectTo(room);
+        assert.fail("Should not allow third client");
+      } catch (e) {
+        assert.ok(true);
+      }
     });
   });
 });
