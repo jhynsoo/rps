@@ -119,4 +119,67 @@ describe("testing your Colyseus app", () => {
       }
     });
   });
+
+  describe("Game Mode Selection Tests", () => {
+    it("first player can select game mode", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      client1.send("select_mode", { mode: "best_of_3" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameMode, "best_of_3");
+      assert.strictEqual(room.state.gameStatus, "choosing");
+    });
+
+    it("second player cannot select game mode", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client2.send("select_mode", { mode: "best_of_5" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+    });
+
+    it("invalid mode is ignored", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "invalid_mode" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+    });
+
+    it("all valid modes work: single, best_of_3, best_of_5", async () => {
+      const validModes = ["single", "best_of_3", "best_of_5"];
+
+      for (const mode of validModes) {
+        const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+        const client1 = await colyseus.connectTo(room);
+        const client2 = await colyseus.connectTo(room);
+        await room.waitForNextPatch();
+
+        client1.send("select_mode", { mode });
+        await room.waitForNextPatch();
+
+        assert.strictEqual(room.state.gameMode, mode);
+        assert.strictEqual(room.state.gameStatus, "choosing");
+
+        await client1.leave();
+        await client2.leave();
+      }
+    });
+  });
 });
