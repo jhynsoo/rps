@@ -341,4 +341,58 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.winner, client2.sessionId);
     });
   });
+
+  describe("Timer Tests", () => {
+    it("countdown starts at 10 when entering choosing state", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.countdown, 10);
+    });
+
+    it("countdown decreases over time", async function () {
+      this.timeout(5000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.countdown, 10);
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      assert.ok(room.state.countdown < 10);
+    });
+
+    it("timer assigns random choice to players who have not chosen", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 11000));
+
+      const p1 = room.state.players.get(client1.sessionId);
+      const p2 = room.state.players.get(client2.sessionId);
+
+      assert.ok(["rock", "paper", "scissors"].includes(p1?.choice || ""));
+      assert.ok(["rock", "paper", "scissors"].includes(p2?.choice || ""));
+      assert.strictEqual(room.state.gameStatus, "result");
+    });
+  });
 });

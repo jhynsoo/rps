@@ -1,4 +1,4 @@
-import { type Client, Room } from "colyseus";
+import { type Client, type Delayed, Room } from "colyseus";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
 const VALID_MODES = ["single", "best_of_3", "best_of_5"];
@@ -13,6 +13,7 @@ const WIN_MAP: Record<string, string> = {
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
   private firstPlayerSessionId: string = "";
+  private countdownInterval: Delayed | null = null;
 
   onCreate(options: unknown) {
     this.setState(new MyRoomState());
@@ -23,7 +24,7 @@ export class MyRoom extends Room<MyRoomState> {
       if (!VALID_MODES.includes(message.mode)) return;
 
       this.state.gameMode = message.mode;
-      this.state.gameStatus = "choosing";
+      this.startChoosingPhase();
     });
 
     this.onMessage("choice", (client, message: { choice: string }) => {
@@ -39,6 +40,37 @@ export class MyRoom extends Room<MyRoomState> {
     });
   }
 
+  private startChoosingPhase() {
+    this.state.gameStatus = "choosing";
+    this.state.countdown = 10;
+
+    this.countdownInterval = this.clock.setInterval(() => {
+      this.state.countdown -= 1;
+
+      if (this.state.countdown <= 0) {
+        this.stopCountdown();
+        this.assignRandomChoices();
+        this.determineWinner();
+      }
+    }, 1000);
+  }
+
+  private stopCountdown() {
+    if (this.countdownInterval) {
+      this.countdownInterval.clear();
+      this.countdownInterval = null;
+    }
+  }
+
+  private assignRandomChoices() {
+    this.state.players.forEach((player) => {
+      if (player.choice === "") {
+        const randomIndex = Math.floor(Math.random() * VALID_CHOICES.length);
+        player.choice = VALID_CHOICES[randomIndex];
+      }
+    });
+  }
+
   private checkBothPlayersChosen() {
     let allChosen = true;
     this.state.players.forEach((player) => {
@@ -46,6 +78,7 @@ export class MyRoom extends Room<MyRoomState> {
     });
 
     if (allChosen && this.state.players.size === 2) {
+      this.stopCountdown();
       this.determineWinner();
     }
   }
@@ -88,6 +121,7 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   onDispose() {
+    this.stopCountdown();
     console.log("room", this.roomId, "disposing...");
   }
 }
