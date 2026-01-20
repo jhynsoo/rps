@@ -99,6 +99,41 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     this.state.gameStatus = "result";
+
+    this.clock.setTimeout(() => {
+      this.handleRoundEnd();
+    }, 3000);
+  }
+
+  private getWinThreshold(): number {
+    switch (this.state.gameMode) {
+      case "single":
+        return 1;
+      case "best_of_3":
+        return 2;
+      case "best_of_5":
+        return 3;
+      default:
+        return 1;
+    }
+  }
+
+  private handleRoundEnd() {
+    const winThreshold = this.getWinThreshold();
+    const players = Array.from(this.state.players.values());
+    const gameWinner = players.find((p) => p.score >= winThreshold);
+
+    if (gameWinner) {
+      this.state.gameStatus = "finished";
+      this.state.winner = gameWinner.sessionId;
+    } else {
+      players.forEach((player) => {
+        player.choice = "";
+      });
+      this.state.roundNumber += 1;
+      this.state.winner = "";
+      this.startChoosingPhase();
+    }
   }
 
   onJoin(client: Client, options: unknown) {
