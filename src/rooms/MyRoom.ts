@@ -15,7 +15,7 @@ export class MyRoom extends Room<MyRoomState> {
   private firstPlayerSessionId: string = "";
   private countdownInterval: Delayed | null = null;
 
-  onCreate(options: unknown) {
+  onCreate(_options: unknown) {
     this.setState(new MyRoomState());
 
     this.onMessage("select_mode", (client, message: { mode: string }) => {
@@ -136,7 +136,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
   }
 
-  onJoin(client: Client, options: unknown) {
+  onJoin(client: Client, _options: unknown) {
     const player = new Player();
     player.sessionId = client.sessionId;
     this.state.players.set(client.sessionId, player);
@@ -151,7 +151,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
   }
 
-  onLeave(client: Client, consented: boolean) {
+  onLeave(client: Client, _consented: boolean) {
     const isGameInProgress =
       this.state.gameStatus !== "waiting" && this.state.gameStatus !== "finished";
 

@@ -1,5 +1,5 @@
+import assert from "node:assert";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
-import assert from "assert";
 
 import appConfig from "../src/app.config";
 import { MyRoomState, Player } from "../src/rooms/schema/MyRoomState";
@@ -76,12 +76,12 @@ describe("testing your Colyseus app", () => {
 
     it("gameStatus changes to mode_select when 2 players join", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
-      const client1 = await colyseus.connectTo(room);
+      const _client1 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       assert.strictEqual(room.state.gameStatus, "waiting");
 
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       assert.strictEqual(room.state.players.size, 2);
@@ -105,8 +105,8 @@ describe("testing your Colyseus app", () => {
 
     it("maxClients is 2", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
-      const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client1 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
 
       await room.waitForNextPatch();
       assert.strictEqual(room.state.players.size, 2);
@@ -114,7 +114,7 @@ describe("testing your Colyseus app", () => {
       try {
         await colyseus.connectTo(room);
         assert.fail("Should not allow third client");
-      } catch (e) {
+      } catch (_e) {
         assert.ok(true);
       }
     });
@@ -124,7 +124,7 @@ describe("testing your Colyseus app", () => {
     it("first player can select game mode", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       assert.strictEqual(room.state.gameStatus, "mode_select");
@@ -138,7 +138,7 @@ describe("testing your Colyseus app", () => {
 
     it("second player cannot select game mode", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
-      const client1 = await colyseus.connectTo(room);
+      const _client1 = await colyseus.connectTo(room);
       const client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
@@ -152,7 +152,7 @@ describe("testing your Colyseus app", () => {
     it("invalid mode is ignored", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       client1.send("select_mode", { mode: "invalid_mode" });
@@ -187,7 +187,7 @@ describe("testing your Colyseus app", () => {
     it("player can choose rock/paper/scissors during choosing state", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       client1.send("select_mode", { mode: "single" });
@@ -205,7 +205,7 @@ describe("testing your Colyseus app", () => {
     it("invalid choice is ignored", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       client1.send("select_mode", { mode: "single" });
@@ -221,7 +221,7 @@ describe("testing your Colyseus app", () => {
     it("choice is ignored when not in choosing state", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       assert.strictEqual(room.state.gameStatus, "mode_select");
@@ -346,7 +346,7 @@ describe("testing your Colyseus app", () => {
     it("countdown starts at 10 when entering choosing state", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       client1.send("select_mode", { mode: "single" });
@@ -361,7 +361,7 @@ describe("testing your Colyseus app", () => {
 
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const client1 = await colyseus.connectTo(room);
-      const client2 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
       await room.waitForNextPatch();
 
       client1.send("select_mode", { mode: "single" });
