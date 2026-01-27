@@ -1,4 +1,4 @@
-# RPS (Rock Paper Scissors) - AGENTS.md
+# RPS Server - AGENTS.md
 
 > An online Rock Paper Scissors game built with Colyseus
 
@@ -26,7 +26,7 @@ Colyseus multiplayer game framework.
 ## Directory Structure
 
 ```
-rps/
+server/
 ├── src/
 │   ├── index.ts              # Server entry point
 │   ├── app.config.ts         # Colyseus and Express configuration
