@@ -12,7 +12,6 @@ const WIN_MAP: Record<string, string> = {
 
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
-  private firstPlayerSessionId: string = "";
   private countdownInterval: Delayed | null = null;
 
   onCreate(_options: unknown) {
@@ -20,7 +19,7 @@ export class MyRoom extends Room<MyRoomState> {
 
     this.onMessage("select_mode", (client, message: { mode: string }) => {
       if (this.state.gameStatus !== "mode_select") return;
-      if (client.sessionId !== this.firstPlayerSessionId) return;
+      if (client.sessionId !== this.state.hostSessionId) return;
       if (!VALID_MODES.includes(message.mode)) return;
 
       this.state.gameMode = message.mode;
@@ -38,6 +37,32 @@ export class MyRoom extends Room<MyRoomState> {
 
       this.checkBothPlayersChosen();
     });
+
+    this.onMessage("rematch_ready", (client) => {
+      if (this.state.gameStatus !== "finished") return;
+
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+
+      player.isReady = true;
+      this.maybeResetToLobby();
+    });
+
+    this.onMessage("rematch_cancel", (client) => {
+      if (this.state.gameStatus !== "finished") return;
+
+      const player = this.state.players.get(client.sessionId);
+      if (!player) return;
+
+      player.isReady = false;
+    });
+  }
+
+  private sanitizeNickname(value: unknown): string {
+    if (typeof value !== "string") return "Player";
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return "Player";
+    return trimmed.slice(0, 12);
   }
 
   private startChoosingPhase() {
@@ -60,6 +85,36 @@ export class MyRoom extends Room<MyRoomState> {
       this.countdownInterval.clear();
       this.countdownInterval = null;
     }
+  }
+
+  private maybeResetToLobby() {
+    if (this.state.gameStatus !== "finished") return;
+    if (this.state.players.size !== 2) return;
+
+    let allReady = true;
+    this.state.players.forEach((player) => {
+      if (!player.isReady) allReady = false;
+    });
+
+    if (!allReady) return;
+
+    this.resetMatchState();
+  }
+
+  private resetMatchState() {
+    this.stopCountdown();
+
+    this.state.players.forEach((player) => {
+      player.score = 0;
+      player.choice = "";
+      player.isReady = false;
+    });
+
+    this.state.roundNumber = 1;
+    this.state.winner = "";
+    this.state.countdown = 0;
+    this.state.gameMode = "";
+    this.state.gameStatus = this.state.players.size === 2 ? "mode_select" : "waiting";
   }
 
   private assignRandomChoices() {
@@ -136,13 +191,17 @@ export class MyRoom extends Room<MyRoomState> {
     }
   }
 
-  onJoin(client: Client, _options: unknown) {
+  onJoin(client: Client, options: unknown) {
     const player = new Player();
     player.sessionId = client.sessionId;
+    player.nickname = this.sanitizeNickname((options as Record<string, unknown> | null)?.nickname);
     this.state.players.set(client.sessionId, player);
 
     if (this.state.players.size === 1) {
-      this.firstPlayerSessionId = client.sessionId;
+      this.state.hostSessionId = client.sessionId;
+    } else if (this.state.hostSessionId === "") {
+      const firstPlayer = this.state.players.values().next().value as Player | undefined;
+      this.state.hostSessionId = firstPlayer?.sessionId ?? "";
     }
 
     if (this.state.players.size === 2) {
@@ -169,6 +228,16 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     this.state.players.delete(client.sessionId);
+
+    if (this.state.players.size === 0) {
+      this.state.hostSessionId = "";
+      return;
+    }
+
+    if (!this.state.players.has(this.state.hostSessionId)) {
+      const nextHost = this.state.players.values().next().value as Player | undefined;
+      this.state.hostSessionId = nextHost?.sessionId ?? "";
+    }
   }
 
   onDispose() {
