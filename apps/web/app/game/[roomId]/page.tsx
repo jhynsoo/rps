@@ -1,0 +1,347 @@
+"use client";
+
+import type { Room } from "colyseus.js";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+import type { RpsChoice } from "@/lib/rps";
+import { useGameStore } from "@/store/game-store";
+
+type PlayerLike = {
+  sessionId: string;
+  nickname: string;
+  choice: string;
+  score: number;
+  isReady: boolean;
+};
+
+type MyRoomStateLike = {
+  players: {
+    size: number;
+    values: () => IterableIterator<PlayerLike>;
+  };
+  gameStatus: string;
+  gameMode: string;
+  countdown: number;
+  winner: string;
+  roundNumber: number;
+};
+
+function getState(room: Room | null): MyRoomStateLike | null {
+  if (!room) return null;
+  return room.state as MyRoomStateLike;
+}
+
+function getWinnerLabel(winner: string, players: PlayerLike[]) {
+  if (!winner) return "";
+  if (winner === "draw") return "Draw";
+  const p = players.find((x) => x.sessionId === winner);
+  return p?.nickname || winner.slice(0, 6);
+}
+
+export default function GamePage() {
+  const router = useRouter();
+  const params = useParams<{ roomId: string }>();
+  const roomId = params.roomId ?? "";
+
+  const room = useGameStore((s) => s.room);
+  const storeRoomId = useGameStore((s) => s.roomId);
+  const roomVersion = useGameStore((s) => s.roomVersion);
+  const leaveError = useGameStore((s) => s.leaveError);
+  const leaveRoom = useGameStore((s) => s.leaveRoom);
+
+  const state = getState(room);
+  const isMismatch = !!storeRoomId && storeRoomId !== roomId;
+  void roomVersion;
+
+  const players = state ? Array.from(state.players.values()) : [];
+  const self = room
+    ? (players.find((p) => p.sessionId === room.sessionId) ?? null)
+    : null;
+
+  const gameStatus = state?.gameStatus ?? "";
+  const selfChoice = self?.choice ?? "";
+  const selfReady = self?.isReady ?? false;
+
+  const [choiceSent, setChoiceSent] = useState<RpsChoice | null>(null);
+
+  const hadTwoPlayersRef = useRef(false);
+  const [opponentLeft, setOpponentLeft] = useState(false);
+
+  useEffect(() => {
+    if (gameStatus !== "mode_select") return;
+    if (!roomId) return;
+    router.replace(`/room/${roomId}`);
+  }, [gameStatus, roomId, router]);
+
+  useEffect(() => {
+    if (gameStatus !== "choosing") return;
+    if (selfChoice !== "") return;
+    setChoiceSent(null);
+  }, [gameStatus, selfChoice]);
+
+  useEffect(() => {
+    const size = state?.players.size ?? 0;
+    if (size === 2) {
+      hadTwoPlayersRef.current = true;
+      setOpponentLeft(false);
+    }
+    if (size === 1 && hadTwoPlayersRef.current) setOpponentLeft(true);
+  }, [state?.players.size]);
+
+  async function onBackToLobby() {
+    try {
+      await leaveRoom();
+    } finally {
+      router.push("/lobby");
+    }
+  }
+
+  if (!room || !state || isMismatch) {
+    const title = !room
+      ? "No active room"
+      : isMismatch
+        ? "Room mismatch"
+        : "Room unavailable";
+    const detail = !room
+      ? "This page requires an active room in memory. Reconnect on refresh is not supported."
+      : isMismatch
+        ? `Active room is ${storeRoomId ?? "-"} but URL is ${roomId || "-"}.`
+        : "Room state is missing.";
+
+    return (
+      <main className="min-h-dvh bg-background text-foreground">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+              <p className="font-mono text-xs text-muted-foreground">Game</p>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">
+                {title}
+              </h1>
+              <p className="mt-3 text-sm text-muted-foreground">{detail}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  void onBackToLobby();
+                }}
+                className="mt-6 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span>Back to lobby</span>
+                <span className="font-mono text-xs opacity-70">/lobby</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const readyCount = players.filter((p) => p.isReady).length;
+  const totalPlayers = state.players.size;
+  const roundWinnerLabel = getWinnerLabel(state.winner, players);
+  const isMultiRound =
+    state.gameMode === "best_of_3" || state.gameMode === "best_of_5";
+
+  const activeRoom = room;
+
+  const canChoose =
+    !leaveError &&
+    gameStatus === "choosing" &&
+    !!self &&
+    selfChoice === "" &&
+    choiceSent === null;
+
+  function sendChoice(choice: RpsChoice) {
+    if (!canChoose) return;
+    setChoiceSent(choice);
+    activeRoom.send("choice", { choice });
+  }
+
+  return (
+    <main className="min-h-dvh bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
+
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-xs text-muted-foreground">Game</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">
+                  Round {state.roundNumber}
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Status: <span className="text-foreground">{gameStatus}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="back-to-room"
+                onClick={() => router.push(`/room/${roomId}`)}
+                className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
+              >
+                Back to room
+              </button>
+            </div>
+
+            {leaveError ? (
+              <p className="mt-4 text-sm text-destructive">{leaveError}</p>
+            ) : null}
+
+            {!leaveError && opponentLeft ? (
+              <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
+                <p className="font-mono text-xs text-muted-foreground">
+                  Status
+                </p>
+                <p className="mt-1 text-sm text-foreground">Opponent left</p>
+              </div>
+            ) : null}
+
+            <div className="mt-6 grid gap-3">
+              <div className="rounded-2xl border border-border bg-background/60 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Countdown
+                </p>
+                <p
+                  data-testid="countdown"
+                  className="mt-1 font-mono text-3xl tracking-tight"
+                >
+                  {state.countdown}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background/60 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Your choice
+                </p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    data-testid="choice-rock"
+                    disabled={!canChoose}
+                    onClick={() => sendChoice("rock")}
+                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Rock
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="choice-paper"
+                    disabled={!canChoose}
+                    onClick={() => sendChoice("paper")}
+                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Paper
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="choice-scissors"
+                    disabled={!canChoose}
+                    onClick={() => sendChoice("scissors")}
+                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Scissors
+                  </button>
+                </div>
+
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {selfChoice
+                    ? `Locked: ${selfChoice}`
+                    : choiceSent
+                      ? `Sending: ${choiceSent}`
+                      : gameStatus === "choosing"
+                        ? "Pick one."
+                        : "Waiting for next round."}
+                </p>
+              </div>
+
+              {gameStatus === "result" ? (
+                <div className="rounded-2xl border border-border bg-background/60 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Round result
+                  </p>
+                  <p
+                    data-testid="round-winner"
+                    className="mt-2 font-mono text-lg"
+                  >
+                    {roundWinnerLabel ? `Winner: ${roundWinnerLabel}` : ""}
+                  </p>
+                </div>
+              ) : null}
+
+              {gameStatus === "finished" ? (
+                <div className="rounded-2xl border border-border bg-background/60 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Match result
+                  </p>
+                  <p
+                    data-testid="match-winner"
+                    className="mt-2 font-mono text-lg"
+                  >
+                    {roundWinnerLabel ? `Winner: ${roundWinnerLabel}` : ""}
+                  </p>
+                </div>
+              ) : null}
+
+              {isMultiRound ? (
+                <div className="rounded-2xl border border-border bg-background/60 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Score
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    {players.map((p) => (
+                      <div
+                        key={p.sessionId}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="min-w-0 truncate font-mono text-sm">
+                          {p.nickname || "Player"}
+                        </span>
+                        <span className="font-mono text-sm">{p.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-border bg-background/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Rematch
+                    </p>
+                    <p
+                      data-testid="rematch-status"
+                      className="mt-1 text-sm text-muted-foreground"
+                    >
+                      Ready:{" "}
+                      <span className="text-foreground">{readyCount}</span>/
+                      {totalPlayers}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="rematch-ready"
+                    disabled={
+                      !!leaveError || gameStatus !== "finished" || !self
+                    }
+                    onClick={() => {
+                      if (gameStatus !== "finished" || !self) return;
+                      activeRoom.send(
+                        selfReady ? "rematch_cancel" : "rematch_ready",
+                      );
+                    }}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-xs font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50"
+                  >
+                    {selfReady ? "Cancel" : "Ready"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
