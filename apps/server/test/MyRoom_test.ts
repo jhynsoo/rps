@@ -17,6 +17,7 @@ describe("testing your Colyseus app", () => {
     it("Player class has correct default values", () => {
       const player = new Player();
       assert.strictEqual(player.sessionId, "");
+      assert.strictEqual(player.nickname, "Player");
       assert.strictEqual(player.choice, "");
       assert.strictEqual(player.score, 0);
       assert.strictEqual(player.isReady, false);
@@ -29,6 +30,7 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(state.countdown, 0);
       assert.strictEqual(state.winner, "");
       assert.strictEqual(state.roundNumber, 1);
+      assert.strictEqual(state.hostSessionId, "");
       assert.ok(state.players);
     });
 
@@ -72,6 +74,55 @@ describe("testing your Colyseus app", () => {
       const player = room.state.players.get(client1.sessionId);
       assert.ok(player);
       assert.strictEqual(player.sessionId, client1.sessionId);
+    });
+
+    it("hostSessionId is set to first joining player", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.hostSessionId, client1.sessionId);
+    });
+
+    it("hostSessionId remains the first player after second join", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+      const _client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.hostSessionId, client1.sessionId);
+    });
+
+    it("hostSessionId transfers when host leaves", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.hostSessionId, client1.sessionId);
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 1);
+      assert.strictEqual(room.state.hostSessionId, client2.sessionId);
+    });
+
+    it("nickname is stored from join options (trimmed, capped, fallback)", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+
+      const client1 = await colyseus.connectTo(room, { nickname: "   " });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.nickname, "Player");
+
+      const client2 = await colyseus.connectTo(room, {
+        nickname: "  123456789012345  ",
+      });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.nickname, "123456789012");
     });
 
     it("gameStatus changes to mode_select when 2 players join", async () => {
@@ -608,6 +659,166 @@ describe("testing your Colyseus app", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 4000));
       assert.strictEqual(room.state.gameStatus, "finished");
+    });
+  });
+
+  describe("Rematch / Reset-to-lobby Tests", () => {
+    it("rematch_ready is ignored unless gameStatus is finished", async function () {
+      this.timeout(5000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      client1.send("rematch_ready");
+      client2.send("rematch_ready");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.isReady, false);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.isReady, false);
+    });
+
+    it("requires both players ready before reset (roomId preserved)", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+
+      const roomIdBefore = room.roomId;
+      const hostBefore = room.state.hostSessionId;
+      const winnerBefore = room.state.winner;
+      const modeBefore = room.state.gameMode;
+      const p1ScoreBefore = room.state.players.get(client1.sessionId)?.score;
+      const p2ScoreBefore = room.state.players.get(client2.sessionId)?.score;
+
+      client1.send("rematch_ready");
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.roomId, roomIdBefore);
+      assert.strictEqual(room.state.hostSessionId, hostBefore);
+      assert.strictEqual(room.state.winner, winnerBefore);
+      assert.strictEqual(room.state.gameMode, modeBefore);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.isReady, true);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.isReady, false);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, p1ScoreBefore);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.score, p2ScoreBefore);
+
+      client2.send("rematch_ready");
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.roomId, roomIdBefore);
+      assert.strictEqual(room.state.hostSessionId, hostBefore);
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.countdown, 0);
+      assert.strictEqual(room.state.roundNumber, 1);
+      assert.strictEqual(room.state.winner, "");
+
+      const p1 = room.state.players.get(client1.sessionId);
+      const p2 = room.state.players.get(client2.sessionId);
+      assert.strictEqual(p1?.score, 0);
+      assert.strictEqual(p2?.score, 0);
+      assert.strictEqual(p1?.choice, "");
+      assert.strictEqual(p2?.choice, "");
+      assert.strictEqual(p1?.isReady, false);
+      assert.strictEqual(p2?.isReady, false);
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      assert.strictEqual(room.state.countdown, 0);
+    });
+
+    it("rematch_cancel clears readiness in finished state", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+
+      client1.send("rematch_ready");
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.isReady, true);
+
+      client1.send("rematch_cancel");
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.isReady, false);
+      assert.strictEqual(room.state.gameStatus, "finished");
+    });
+
+    it("reset semantics are exact (best_of_3 sets roundNumber back to 1)", async function () {
+      this.timeout(25000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "best_of_3" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.roundNumber, 2);
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.roundNumber, 2);
+      assert.strictEqual(room.state.winner, client1.sessionId);
+
+      const roomIdBefore = room.roomId;
+      const hostBefore = room.state.hostSessionId;
+
+      client1.send("rematch_ready");
+      client2.send("rematch_ready");
+      for (let i = 0; i < 5 && room.state.gameStatus !== "mode_select"; i++) {
+        await room.waitForNextPatch();
+      }
+
+      assert.strictEqual(room.roomId, roomIdBefore);
+      assert.strictEqual(room.state.hostSessionId, hostBefore);
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.countdown, 0);
+      assert.strictEqual(room.state.winner, "");
+      assert.strictEqual(room.state.roundNumber, 1);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 0);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.score, 0);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.choice, "");
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.choice, "");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.isReady, false);
+      assert.strictEqual(room.state.players.get(client2.sessionId)?.isReady, false);
     });
   });
 });
