@@ -99,7 +99,7 @@ Provides two scenarios:
 ┌─────────────────────────────┐
 │      Room Created           │
 │                             │
-│      [ 1 2 3 4 5 6 ]        │
+│      [ roomId ]             │
 │                             │
 │      Waiting...             │
 │    ─────────────────        │
@@ -122,7 +122,7 @@ Provides two scenarios:
 ┌─────────────────────────────┐
 │    Enter Room Code          │
 │                             │
-│    [ _ _ _ _ _ _ ]          │
+│    [ roomId ]               │
 │                             │
 │    👤 Host: Player1         │
 │                             │
@@ -143,6 +143,12 @@ Provides two scenarios:
 │  Time Left: 5s              │
 └─────────────────────────────┘
 ```
+
+### 4. Rematch
+
+- A rematch is played within the **same `roomId` and the same Room session**
+- When both players indicate they are ready for a rematch, the server resets the game state and starts the next match
+- At a high level, the reset scope includes each player's `choice`, `score`, and `ready` state, along with round-related values and `gameStatus`
 
 ---
 
