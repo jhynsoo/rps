@@ -1,5 +1,4 @@
 "use client";
-
 import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +30,6 @@ export default function JoinRoomPage() {
   const router = useRouter();
   const setRoom = useGameStore((s) => s.setRoom);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
-  const roomVersion = useGameStore((s) => s.roomVersion);
   const leaveError = useGameStore((s) => s.leaveError);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -43,8 +41,6 @@ export default function JoinRoomPage() {
   const [roomIdInput, setRoomIdInput] = useState("");
   const [touched, setTouched] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [room, setRoomLocal] = useState<Room | null>(null);
-  const [playersCount, setPlayersCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,34 +67,6 @@ export default function JoinRoomPage() {
     };
   }, [leaveRoom]);
 
-  useEffect(() => {
-    if (!room) return;
-    void roomVersion;
-    const state = room.state as
-      | {
-          players?: {
-            size?: number;
-          };
-        }
-      | undefined;
-    setPlayersCount(state?.players?.size ?? 0);
-  }, [room, roomVersion]);
-
-  useEffect(() => {
-    if (!room) return;
-    void roomVersion;
-    const state = room.state as
-      | {
-          gameStatus?: string;
-        }
-      | undefined;
-
-    if (state?.gameStatus !== "choosing") return;
-
-    transferredRef.current = true;
-    router.replace(`/game/${room.roomId}`);
-  }, [room, roomVersion, router]);
-
   const validationMessage = useMemo(() => {
     if (!touched) return null;
     if (roomIdInput.trim().length === 0) return "Room code is required";
@@ -116,8 +84,6 @@ export default function JoinRoomPage() {
     roomRef.current = null;
     if (previous) {
       void leaveRoom();
-      setRoomLocal(null);
-      setPlayersCount(0);
     }
 
     const roomId = roomIdInput.trim();
@@ -136,8 +102,10 @@ export default function JoinRoomPage() {
       }
 
       roomRef.current = joined;
-      setRoomLocal(joined);
       setRoom(joined);
+
+      transferredRef.current = true;
+      router.replace(`/room/${joined.roomId}`);
     } catch (err) {
       if (mountedRef.current) setError(formatJoinError(err));
     } finally {
@@ -145,11 +113,7 @@ export default function JoinRoomPage() {
     }
   }
 
-  const headerLine = useMemo(() => {
-    if (!room) return "Enter a room code to join.";
-    if (playersCount < 2) return "Joined. Waiting for host...";
-    return "Joined.";
-  }, [playersCount, room]);
+  const headerLine = "Enter a room code to join.";
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -206,7 +170,7 @@ export default function JoinRoomPage() {
               <button
                 type="submit"
                 data-testid="join-submit"
-                disabled={joining || !nickname || !!room}
+                disabled={joining || !nickname}
                 className="inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>{joining ? "Joining..." : "Join"}</span>
@@ -221,30 +185,6 @@ export default function JoinRoomPage() {
             ) : null}
 
             {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
-
-            {room ? (
-              <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">Joined room</p>
-                <p className="mt-1 font-mono text-lg">{room.roomId}</p>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Players: <span className="text-foreground">{playersCount}/2</span>
-                </p>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              disabled={!room || !!error || !!leaveError}
-              onClick={() => {
-                if (!room) return;
-                transferredRef.current = true;
-                router.push(`/room/${room.roomId}`);
-              }}
-              className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span>Continue</span>
-              <span className="font-mono text-xs opacity-70">/room/{room?.roomId ?? "-"}</span>
-            </button>
 
             {nickname ? (
               <p className="mt-4 text-xs text-muted-foreground">

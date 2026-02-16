@@ -59,9 +59,6 @@ async function createAndJoinRoom(
   await pageB.getByTestId("join-submit").click();
   await expect(pageB.getByTestId("room-error")).toHaveCount(0);
 
-  const joinContinueButton = pageB.getByRole("button", { name: "Continue" });
-  await expect(joinContinueButton).toBeEnabled({ timeout: WS_TIMEOUT_MS });
-  await joinContinueButton.click();
   await expect(pageB).toHaveURL(new RegExp(`/room/${roomId}$`), {
     timeout: WS_TIMEOUT_MS,
   });
