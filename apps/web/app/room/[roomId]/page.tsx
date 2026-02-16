@@ -225,7 +225,7 @@ export default function RoomLobbyPage() {
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {MODES.map((m) => {
                   const active = selectedMode === m.mode;
-                  const disabled = !canControl;
+                  const disabled = !isHost;
                   return (
                     <button
                       key={m.mode}
