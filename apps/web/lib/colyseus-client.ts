@@ -6,6 +6,8 @@ type NicknameOptions = {
   nickname: string;
 };
 
+const DEFAULT_ENDPOINT = "ws://127.0.0.1:2567";
+
 let clientSingleton: Client | null = null;
 
 function assertClientSide() {
@@ -17,7 +19,7 @@ function assertClientSide() {
 }
 
 function getEndpoint() {
-  return process.env.NEXT_PUBLIC_COLYSEUS_URL ?? "ws://localhost:2567";
+  return process.env.NEXT_PUBLIC_COLYSEUS_URL ?? DEFAULT_ENDPOINT;
 }
 
 function getClient() {
