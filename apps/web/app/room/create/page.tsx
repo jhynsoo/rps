@@ -73,6 +73,9 @@ export default function CreateRoomPage() {
         roomRef.current = created;
         setRoomLocal(created);
         setRoom(created);
+
+        transferredRef.current = true;
+        router.replace(`/room/${created.roomId}`);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Failed to create room.");
@@ -88,7 +91,7 @@ export default function CreateRoomPage() {
 
       if (current && !transferredRef.current) void leaveRoom();
     };
-  }, [nickname, leaveRoom, setRoom]);
+  }, [nickname, leaveRoom, router, setRoom]);
 
   const roomId = room?.roomId ?? "";
   const statusLine = useMemo(() => {

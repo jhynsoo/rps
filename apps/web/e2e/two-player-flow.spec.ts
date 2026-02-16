@@ -44,17 +44,14 @@ async function createAndJoinRoom(
 
   await setNickname(pageA, nicknameA);
   await pageA.getByTestId("nav-create-room").click();
-  await expect(pageA).toHaveURL(/\/room\/create$/, { timeout: UI_TIMEOUT_MS });
-
-  const roomIdDisplay = pageA.getByTestId("roomid-display");
-  await expect(roomIdDisplay).not.toHaveText("-", { timeout: WS_TIMEOUT_MS });
-  const roomId = (await roomIdDisplay.textContent())?.trim() ?? "";
-  expect(roomId).not.toBe("");
-
-  await pageA.getByRole("button", { name: "Continue" }).click();
-  await expect(pageA).toHaveURL(new RegExp(`/room/${roomId}$`), {
+  await expect(pageA).toHaveURL(/\/room\/[^/]+$/, { timeout: WS_TIMEOUT_MS });
+  await expect(pageA.getByTestId("player-list")).toBeVisible({
     timeout: WS_TIMEOUT_MS,
   });
+
+  const match = pageA.url().match(/\/room\/([^/]+)$/);
+  const roomId = match?.[1]?.trim() ?? "";
+  expect(roomId).not.toBe("");
 
   await setNickname(pageB, nicknameB);
   await pageB.getByTestId("nav-join-room").click();
