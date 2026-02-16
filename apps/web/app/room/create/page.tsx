@@ -124,15 +124,9 @@ export default function CreateRoomPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">
-                  Private Room
-                </p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                  Create room
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Creating a room...
-                </p>
+                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">Create room</h1>
+                <p className="mt-2 text-sm text-muted-foreground">Creating a room...</p>
               </div>
               <button
                 type="button"
@@ -148,13 +142,8 @@ export default function CreateRoomPage() {
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Room code
-                  </p>
-                  <p
-                    data-testid="roomid-display"
-                    className="mt-1 truncate font-mono text-lg"
-                  >
+                  <p className="text-xs font-medium text-muted-foreground">Room code</p>
+                  <p data-testid="roomid-display" className="mt-1 truncate font-mono text-lg">
                     {roomId || "-"}
                   </p>
                 </div>
@@ -171,8 +160,7 @@ export default function CreateRoomPage() {
 
               <div className="mt-4 grid gap-1 text-sm">
                 <p className="text-muted-foreground">
-                  Players:{" "}
-                  <span className="text-foreground">{playersCount}/2</span>
+                  Players: <span className="text-foreground">{playersCount}/2</span>
                 </p>
                 {error ? (
                   <p className="text-destructive">{error}</p>
@@ -195,15 +183,12 @@ export default function CreateRoomPage() {
               className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span>Continue</span>
-              <span className="font-mono text-xs opacity-70">
-                /room/{roomId || "-"}
-              </span>
+              <span className="font-mono text-xs opacity-70">/room/{roomId || "-"}</span>
             </button>
 
             {nickname ? (
               <p className="mt-4 text-xs text-muted-foreground">
-                You are{" "}
-                <span className="font-mono text-foreground">{nickname}</span>.
+                You are <span className="font-mono text-foreground">{nickname}</span>.
               </p>
             ) : null}
           </div>

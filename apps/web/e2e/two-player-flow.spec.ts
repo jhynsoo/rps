@@ -1,10 +1,4 @@
-import {
-  type Browser,
-  type BrowserContext,
-  expect,
-  type Page,
-  test,
-} from "@playwright/test";
+import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 const UI_TIMEOUT_MS = 10_000;
 const WS_TIMEOUT_MS = 15_000;
@@ -82,12 +76,7 @@ async function createAndJoinRoom(
   return { contextA, contextB, pageA, pageB, roomId };
 }
 
-async function startMatch(
-  pageA: Page,
-  pageB: Page,
-  roomId: string,
-  mode: MatchMode,
-) {
+async function startMatch(pageA: Page, pageB: Page, roomId: string, mode: MatchMode) {
   await expect(pageA.getByTestId("start-game")).toBeEnabled({
     timeout: WS_TIMEOUT_MS,
   });
@@ -161,12 +150,9 @@ test("create/join + single mode full match", async ({ browser }) => {
     await finishMatch(session.pageA, session.pageB, 1);
 
     await session.pageA.getByTestId("back-to-room").click();
-    await expect(session.pageA).toHaveURL(
-      new RegExp(`/room/${session.roomId}$`),
-      {
-        timeout: WS_TIMEOUT_MS,
-      },
-    );
+    await expect(session.pageA).toHaveURL(new RegExp(`/room/${session.roomId}$`), {
+      timeout: WS_TIMEOUT_MS,
+    });
   } finally {
     await closePlayerSession(session);
   }
@@ -195,44 +181,29 @@ test("best_of_5 full match", async ({ browser }) => {
 });
 
 test("rematch keeps same roomId", async ({ browser }) => {
-  const session = await createAndJoinRoom(
-    browser,
-    "AliceRematch",
-    "BobRematch",
-  );
+  const session = await createAndJoinRoom(browser, "AliceRematch", "BobRematch");
 
   try {
     await startMatch(session.pageA, session.pageB, session.roomId, "single");
     await finishMatch(session.pageA, session.pageB, 1);
 
     await session.pageA.getByTestId("rematch-ready").click();
-    await expect(session.pageA.getByTestId("rematch-status")).toContainText(
-      "1/2",
-      {
-        timeout: WS_TIMEOUT_MS,
-      },
-    );
+    await expect(session.pageA.getByTestId("rematch-status")).toContainText("1/2", {
+      timeout: WS_TIMEOUT_MS,
+    });
 
     await session.pageB.getByTestId("rematch-ready").click();
 
-    await expect(session.pageA).toHaveURL(
-      new RegExp(`/room/${session.roomId}$`),
-      {
-        timeout: WS_TIMEOUT_MS,
-      },
-    );
-    await expect(session.pageB).toHaveURL(
-      new RegExp(`/room/${session.roomId}$`),
-      {
-        timeout: WS_TIMEOUT_MS,
-      },
-    );
+    await expect(session.pageA).toHaveURL(new RegExp(`/room/${session.roomId}$`), {
+      timeout: WS_TIMEOUT_MS,
+    });
+    await expect(session.pageB).toHaveURL(new RegExp(`/room/${session.roomId}$`), {
+      timeout: WS_TIMEOUT_MS,
+    });
     await expect(session.pageA.getByTestId("mode-single")).toBeVisible({
       timeout: WS_TIMEOUT_MS,
     });
-    await expect(
-      session.pageA.getByTestId("player-list").locator("li"),
-    ).toHaveCount(2, {
+    await expect(session.pageA.getByTestId("player-list").locator("li")).toHaveCount(2, {
       timeout: WS_TIMEOUT_MS,
     });
   } finally {

@@ -100,11 +100,7 @@ export default function RoomLobbyPage() {
   }
 
   if (!room || !state || isMismatch) {
-    const title = !room
-      ? "No active room"
-      : isMismatch
-        ? "Room mismatch"
-        : "Room unavailable";
+    const title = !room ? "No active room" : isMismatch ? "Room mismatch" : "Room unavailable";
     const detail = !room
       ? "This page requires an active room in memory. Reconnect on refresh is not supported."
       : isMismatch
@@ -118,9 +114,7 @@ export default function RoomLobbyPage() {
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
               <p className="font-mono text-xs text-muted-foreground">Room</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                {title}
-              </h1>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">{title}</h1>
               <p className="mt-3 text-sm text-muted-foreground">{detail}</p>
               <button
                 type="button"
@@ -148,13 +142,10 @@ export default function RoomLobbyPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">
-                  Private Room
-                </p>
+                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
                 <h1 className="mt-1 font-mono text-2xl tracking-tight">Room</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Status:{" "}
-                  <span className="text-foreground">{state.gameStatus}</span>
+                  Status: <span className="text-foreground">{state.gameStatus}</span>
                 </p>
               </div>
               <button
@@ -168,15 +159,11 @@ export default function RoomLobbyPage() {
               </button>
             </div>
 
-            {leaveError ? (
-              <p className="mt-4 text-sm text-destructive">{leaveError}</p>
-            ) : null}
+            {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
 
             {!leaveError && opponentLeft ? (
               <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="font-mono text-xs text-muted-foreground">
-                  Status
-                </p>
+                <p className="font-mono text-xs text-muted-foreground">Status</p>
                 <p className="mt-1 text-sm text-foreground">Opponent left</p>
               </div>
             ) : null}
@@ -184,12 +171,8 @@ export default function RoomLobbyPage() {
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Room code
-                  </p>
-                  <p className="mt-1 truncate font-mono text-lg">
-                    {roomId || "-"}
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">Room code</p>
+                  <p className="mt-1 truncate font-mono text-lg">{roomId || "-"}</p>
                 </div>
                 <button
                   type="button"
@@ -200,15 +183,12 @@ export default function RoomLobbyPage() {
                 </button>
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
-                Players:{" "}
-                <span className="text-foreground">{state.players.size}/2</span>
+                Players: <span className="text-foreground">{state.players.size}/2</span>
               </p>
             </div>
 
             <div className="mt-6">
-              <p className="text-xs font-medium text-muted-foreground">
-                Players
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Players</p>
               <ul
                 data-testid="player-list"
                 className="mt-3 grid gap-2 rounded-2xl border border-border bg-background/60 p-4"
@@ -216,10 +196,7 @@ export default function RoomLobbyPage() {
                 {players.map((p) => {
                   const isHostPlayer = p.sessionId === state.hostSessionId;
                   return (
-                    <li
-                      key={p.sessionId}
-                      className="flex items-center justify-between gap-3"
-                    >
+                    <li key={p.sessionId} className="flex items-center justify-between gap-3">
                       <span className="min-w-0 truncate font-mono text-sm">
                         {p.nickname || "Player"}
                       </span>
@@ -243,9 +220,7 @@ export default function RoomLobbyPage() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
-              <p className="text-xs font-medium text-muted-foreground">
-                Game mode
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Game mode</p>
 
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {MODES.map((m) => {

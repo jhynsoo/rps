@@ -46,10 +46,7 @@ export async function createRoom({ nickname }: NicknameOptions): Promise<Room> {
   return client.create("my_room", { nickname });
 }
 
-export async function joinRoomById(
-  roomId: string,
-  { nickname }: NicknameOptions,
-): Promise<Room> {
+export async function joinRoomById(roomId: string, { nickname }: NicknameOptions): Promise<Room> {
   const client = getClient();
   return client.joinById(roomId, { nickname });
 }

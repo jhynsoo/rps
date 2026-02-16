@@ -55,9 +55,7 @@ export default function GamePage() {
   void roomVersion;
 
   const players = state ? Array.from(state.players.values()) : [];
-  const self = room
-    ? (players.find((p) => p.sessionId === room.sessionId) ?? null)
-    : null;
+  const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
 
   const gameStatus = state?.gameStatus ?? "";
   const selfChoice = self?.choice ?? "";
@@ -98,11 +96,7 @@ export default function GamePage() {
   }
 
   if (!room || !state || isMismatch) {
-    const title = !room
-      ? "No active room"
-      : isMismatch
-        ? "Room mismatch"
-        : "Room unavailable";
+    const title = !room ? "No active room" : isMismatch ? "Room mismatch" : "Room unavailable";
     const detail = !room
       ? "This page requires an active room in memory. Reconnect on refresh is not supported."
       : isMismatch
@@ -116,9 +110,7 @@ export default function GamePage() {
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
               <p className="font-mono text-xs text-muted-foreground">Game</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                {title}
-              </h1>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">{title}</h1>
               <p className="mt-3 text-sm text-muted-foreground">{detail}</p>
               <button
                 type="button"
@@ -140,17 +132,12 @@ export default function GamePage() {
   const readyCount = players.filter((p) => p.isReady).length;
   const totalPlayers = state.players.size;
   const roundWinnerLabel = getWinnerLabel(state.winner, players);
-  const isMultiRound =
-    state.gameMode === "best_of_3" || state.gameMode === "best_of_5";
+  const isMultiRound = state.gameMode === "best_of_3" || state.gameMode === "best_of_5";
 
   const activeRoom = room;
 
   const canChoose =
-    !leaveError &&
-    gameStatus === "choosing" &&
-    !!self &&
-    selfChoice === "" &&
-    choiceSent === null;
+    !leaveError && gameStatus === "choosing" && !!self && selfChoice === "" && choiceSent === null;
 
   function sendChoice(choice: RpsChoice) {
     if (!canChoose) return;
@@ -185,36 +172,25 @@ export default function GamePage() {
               </button>
             </div>
 
-            {leaveError ? (
-              <p className="mt-4 text-sm text-destructive">{leaveError}</p>
-            ) : null}
+            {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
 
             {!leaveError && opponentLeft ? (
               <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="font-mono text-xs text-muted-foreground">
-                  Status
-                </p>
+                <p className="font-mono text-xs text-muted-foreground">Status</p>
                 <p className="mt-1 text-sm text-foreground">Opponent left</p>
               </div>
             ) : null}
 
             <div className="mt-6 grid gap-3">
               <div className="rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Countdown
-                </p>
-                <p
-                  data-testid="countdown"
-                  className="mt-1 font-mono text-3xl tracking-tight"
-                >
+                <p className="text-xs font-medium text-muted-foreground">Countdown</p>
+                <p data-testid="countdown" className="mt-1 font-mono text-3xl tracking-tight">
                   {state.countdown}
                 </p>
               </div>
 
               <div className="rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Your choice
-                </p>
+                <p className="text-xs font-medium text-muted-foreground">Your choice</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -258,13 +234,8 @@ export default function GamePage() {
 
               {gameStatus === "result" ? (
                 <div className="rounded-2xl border border-border bg-background/60 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Round result
-                  </p>
-                  <p
-                    data-testid="round-winner"
-                    className="mt-2 font-mono text-lg"
-                  >
+                  <p className="text-xs font-medium text-muted-foreground">Round result</p>
+                  <p data-testid="round-winner" className="mt-2 font-mono text-lg">
                     {roundWinnerLabel ? `Winner: ${roundWinnerLabel}` : ""}
                   </p>
                 </div>
@@ -272,13 +243,8 @@ export default function GamePage() {
 
               {gameStatus === "finished" ? (
                 <div className="rounded-2xl border border-border bg-background/60 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Match result
-                  </p>
-                  <p
-                    data-testid="match-winner"
-                    className="mt-2 font-mono text-lg"
-                  >
+                  <p className="text-xs font-medium text-muted-foreground">Match result</p>
+                  <p data-testid="match-winner" className="mt-2 font-mono text-lg">
                     {roundWinnerLabel ? `Winner: ${roundWinnerLabel}` : ""}
                   </p>
                 </div>
@@ -286,15 +252,10 @@ export default function GamePage() {
 
               {isMultiRound ? (
                 <div className="rounded-2xl border border-border bg-background/60 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Score
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">Score</p>
                   <div className="mt-3 grid gap-2">
                     {players.map((p) => (
-                      <div
-                        key={p.sessionId}
-                        className="flex items-center justify-between gap-3"
-                      >
+                      <div key={p.sessionId} className="flex items-center justify-between gap-3">
                         <span className="min-w-0 truncate font-mono text-sm">
                           {p.nickname || "Player"}
                         </span>
@@ -308,29 +269,18 @@ export default function GamePage() {
               <div className="rounded-2xl border border-border bg-background/60 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Rematch
-                    </p>
-                    <p
-                      data-testid="rematch-status"
-                      className="mt-1 text-sm text-muted-foreground"
-                    >
-                      Ready:{" "}
-                      <span className="text-foreground">{readyCount}</span>/
-                      {totalPlayers}
+                    <p className="text-xs font-medium text-muted-foreground">Rematch</p>
+                    <p data-testid="rematch-status" className="mt-1 text-sm text-muted-foreground">
+                      Ready: <span className="text-foreground">{readyCount}</span>/{totalPlayers}
                     </p>
                   </div>
                   <button
                     type="button"
                     data-testid="rematch-ready"
-                    disabled={
-                      !!leaveError || gameStatus !== "finished" || !self
-                    }
+                    disabled={!!leaveError || gameStatus !== "finished" || !self}
                     onClick={() => {
                       if (gameStatus !== "finished" || !self) return;
-                      activeRoom.send(
-                        selfReady ? "rematch_cancel" : "rematch_ready",
-                      );
+                      activeRoom.send(selfReady ? "rematch_cancel" : "rematch_ready");
                     }}
                     className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-xs font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50"
                   >

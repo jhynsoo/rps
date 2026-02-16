@@ -8,8 +8,8 @@ describe("cn", () => {
   });
 
   it("ignores nullish and falsey class inputs", () => {
-    expect(
-      cn("font-medium", null, undefined, false && "hidden", "text-xs"),
-    ).toBe("font-medium text-xs");
+    expect(cn("font-medium", null, undefined, false && "hidden", "text-xs")).toBe(
+      "font-medium text-xs",
+    );
   });
 });

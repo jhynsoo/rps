@@ -20,7 +20,7 @@ function formatJoinError(e: unknown) {
 
   if (/full|maxClients|seat|locked/i.test(msg)) return "Room is full.";
   if (/not found|roomId|invalid|no such/i.test(msg)) return "Room not found.";
-  if (/connect|websocket|network|ECONNREFUSED|ENOTFOUND/i.test(msg)) {
+  if (/connect|websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out/i.test(msg)) {
     return "Server is unavailable.";
   }
 
@@ -61,6 +61,8 @@ export default function JoinRoomPage() {
   }, [router]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
       const current = roomRef.current;
@@ -158,15 +160,9 @@ export default function JoinRoomPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">
-                  Private Room
-                </p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                  Join room
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {headerLine}
-                </p>
+                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">Join room</h1>
+                <p className="mt-2 text-sm text-muted-foreground">{headerLine}</p>
               </div>
               <button
                 type="button"
@@ -181,10 +177,7 @@ export default function JoinRoomPage() {
 
             <form onSubmit={onSubmit} className="mt-6 space-y-3">
               <div className="space-y-2">
-                <label
-                  htmlFor="roomId"
-                  className="text-xs font-medium text-muted-foreground"
-                >
+                <label htmlFor="roomId" className="text-xs font-medium text-muted-foreground">
                   Room code
                 </label>
                 <input
@@ -202,9 +195,7 @@ export default function JoinRoomPage() {
                   className="h-12 w-full rounded-xl border border-border bg-card px-4 font-mono text-base shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 {validationMessage ? (
-                  <p className="text-xs text-destructive">
-                    {validationMessage}
-                  </p>
+                  <p className="text-xs text-destructive">{validationMessage}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     Leading/trailing spaces are ignored.
@@ -224,27 +215,19 @@ export default function JoinRoomPage() {
             </form>
 
             {error ? (
-              <p
-                data-testid="room-error"
-                className="mt-4 text-sm text-destructive"
-              >
+              <p data-testid="room-error" className="mt-4 text-sm text-destructive">
                 {error}
               </p>
             ) : null}
 
-            {leaveError ? (
-              <p className="mt-4 text-sm text-destructive">{leaveError}</p>
-            ) : null}
+            {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
 
             {room ? (
               <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Joined room
-                </p>
+                <p className="text-xs font-medium text-muted-foreground">Joined room</p>
                 <p className="mt-1 font-mono text-lg">{room.roomId}</p>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Players:{" "}
-                  <span className="text-foreground">{playersCount}/2</span>
+                  Players: <span className="text-foreground">{playersCount}/2</span>
                 </p>
               </div>
             ) : null}
@@ -260,15 +243,12 @@ export default function JoinRoomPage() {
               className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span>Continue</span>
-              <span className="font-mono text-xs opacity-70">
-                /room/{room?.roomId ?? "-"}
-              </span>
+              <span className="font-mono text-xs opacity-70">/room/{room?.roomId ?? "-"}</span>
             </button>
 
             {nickname ? (
               <p className="mt-4 text-xs text-muted-foreground">
-                You are{" "}
-                <span className="font-mono text-foreground">{nickname}</span>.
+                You are <span className="font-mono text-foreground">{nickname}</span>.
               </p>
             ) : null}
           </div>

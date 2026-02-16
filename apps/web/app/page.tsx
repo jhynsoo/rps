@@ -51,9 +51,7 @@ export default function Home() {
               <span className="font-mono text-lg">RPS</span>
             </div>
             <div>
-              <h1 className="font-mono text-2xl tracking-tight">
-                Pick a nickname
-              </h1>
+              <h1 className="font-mono text-2xl tracking-tight">Pick a nickname</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Used for rooms and match results. You can change it anytime.
               </p>
@@ -62,10 +60,7 @@ export default function Home() {
 
           <form onSubmit={onSubmit} className="mt-8 space-y-3">
             <div className="space-y-2">
-              <label
-                htmlFor="nickname"
-                className="text-xs font-medium text-muted-foreground"
-              >
+              <label htmlFor="nickname" className="text-xs font-medium text-muted-foreground">
                 Nickname (max 12 chars)
               </label>
               <input

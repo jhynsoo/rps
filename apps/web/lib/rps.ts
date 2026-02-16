@@ -1,10 +1,4 @@
-export const GAME_STATUSES = [
-  "waiting",
-  "mode_select",
-  "choosing",
-  "result",
-  "finished",
-] as const;
+export const GAME_STATUSES = ["waiting", "mode_select", "choosing", "result", "finished"] as const;
 
 export type GameStatus = (typeof GAME_STATUSES)[number];
 

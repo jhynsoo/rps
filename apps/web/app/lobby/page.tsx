@@ -51,12 +51,8 @@ export default function LobbyPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs text-muted-foreground">Lobby</p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                  {greeting}
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Choose how you want to play.
-                </p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">{greeting}</h1>
+                <p className="mt-2 text-sm text-muted-foreground">Choose how you want to play.</p>
               </div>
               <button
                 type="button"
@@ -75,9 +71,7 @@ export default function LobbyPage() {
                 className="flex h-14 items-center justify-between rounded-2xl border border-border bg-muted/30 px-4 text-left text-sm font-medium text-foreground/60 shadow-sm"
               >
                 <span>Quick match</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  Coming soon
-                </span>
+                <span className="font-mono text-xs text-muted-foreground">Coming soon</span>
               </button>
 
               <button
