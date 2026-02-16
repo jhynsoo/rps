@@ -2,6 +2,14 @@ import { monitor } from "@colyseus/monitor";
 import { playground } from "@colyseus/playground";
 import config from "@colyseus/tools";
 
+import {
+  recordJoin,
+  recordLeave,
+  recordRoomCreated,
+  recordRoomDisposed,
+  snapshot,
+} from "./observability/runtimeStats";
+
 /**
  * Import your Room files
  */
@@ -12,7 +20,12 @@ export default config({
     /**
      * Define your room handlers:
      */
-    gameServer.define("my_room", MyRoom);
+    const myRoomHandler = gameServer.define("my_room", MyRoom);
+
+    myRoomHandler.on("create", recordRoomCreated);
+    myRoomHandler.on("dispose", recordRoomDisposed);
+    myRoomHandler.on("join", recordJoin);
+    myRoomHandler.on("leave", recordLeave);
   },
 
   initializeExpress: (app) => {
@@ -23,6 +36,12 @@ export default config({
     app.get("/hello_world", (_req, res) => {
       res.send("It's time to kick ass and chew bubblegum!");
     });
+
+    if (process.env.NODE_ENV !== "production") {
+      app.get("/__debug/stats", (_req, res) => {
+        res.json(snapshot({ includeMemory: true, includeHandleCount: true }));
+      });
+    }
 
     /**
      * Use @colyseus/playground

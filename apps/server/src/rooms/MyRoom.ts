@@ -13,6 +13,7 @@ const WIN_MAP: Record<string, string> = {
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
   private countdownInterval: Delayed | null = null;
+  private resultTimeout: Delayed | null = null;
 
   onCreate(_options: unknown) {
     this.setState(new MyRoomState());
@@ -155,9 +156,17 @@ export class MyRoom extends Room<MyRoomState> {
 
     this.state.gameStatus = "result";
 
-    this.clock.setTimeout(() => {
+    this.resultTimeout = this.clock.setTimeout(() => {
+      this.resultTimeout = null;
       this.handleRoundEnd();
     }, 3000);
+  }
+
+  private stopResultTimeout() {
+    if (this.resultTimeout) {
+      this.resultTimeout.clear();
+      this.resultTimeout = null;
+    }
   }
 
   private getWinThreshold(): number {
@@ -211,6 +220,8 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   onLeave(client: Client, _consented: boolean) {
+    this.stopResultTimeout();
+
     const isGameInProgress =
       this.state.gameStatus !== "waiting" && this.state.gameStatus !== "finished";
 
@@ -241,6 +252,7 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   onDispose() {
+    this.stopResultTimeout();
     this.stopCountdown();
     console.log("room", this.roomId, "disposing...");
   }

@@ -492,6 +492,37 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.gameStatus, "finished");
       assert.strictEqual(room.state.winner, client2.sessionId);
     });
+
+    it("result timeout is cleared after leave to avoid later mutation", async function () {
+      this.timeout(7000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "best_of_3" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "rock" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "result");
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+      assert.strictEqual(room.state.roundNumber, 1);
+
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+      assert.strictEqual(room.state.roundNumber, 1);
+    });
   });
 
   describe("Round Management Tests", () => {
