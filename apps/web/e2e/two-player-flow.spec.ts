@@ -44,7 +44,9 @@ async function createAndJoinRoom(
 
   await setNickname(pageA, nicknameA);
   await pageA.getByTestId("nav-create-room").click();
-  await expect(pageA).toHaveURL(/\/room\/[^/]+$/, { timeout: WS_TIMEOUT_MS });
+  await expect(pageA).toHaveURL(/\/room\/(?!create$)[^/]+$/, {
+    timeout: WS_TIMEOUT_MS,
+  });
   await expect(pageA.getByTestId("player-list")).toBeVisible({
     timeout: WS_TIMEOUT_MS,
   });

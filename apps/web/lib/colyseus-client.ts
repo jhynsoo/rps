@@ -6,7 +6,7 @@ type NicknameOptions = {
   nickname: string;
 };
 
-const DEFAULT_ENDPOINT = "ws://127.0.0.1:2567";
+const DEFAULT_PORT = 2567;
 
 let clientSingleton: Client | null = null;
 
@@ -19,7 +19,16 @@ function assertClientSide() {
 }
 
 function getEndpoint() {
-  return process.env.NEXT_PUBLIC_COLYSEUS_URL ?? DEFAULT_ENDPOINT;
+  const fromEnv = process.env.NEXT_PUBLIC_COLYSEUS_URL;
+  if (fromEnv) return fromEnv;
+
+  if (typeof window !== "undefined") {
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const hostname = window.location.hostname || "127.0.0.1";
+    return `${wsProtocol}://${hostname}:${DEFAULT_PORT}`;
+  }
+
+  return `ws://127.0.0.1:${DEFAULT_PORT}`;
 }
 
 function getClient() {
