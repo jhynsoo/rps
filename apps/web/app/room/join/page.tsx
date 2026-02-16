@@ -82,6 +82,21 @@ export default function JoinRoomPage() {
     setPlayersCount(state?.players?.size ?? 0);
   }, [room, roomVersion]);
 
+  useEffect(() => {
+    if (!room) return;
+    void roomVersion;
+    const state = room.state as
+      | {
+          gameStatus?: string;
+        }
+      | undefined;
+
+    if (state?.gameStatus !== "choosing") return;
+
+    transferredRef.current = true;
+    router.replace(`/game/${room.roomId}`);
+  }, [room, roomVersion, router]);
+
   const validationMessage = useMemo(() => {
     if (!touched) return null;
     if (roomIdInput.trim().length === 0) return "Room code is required";
