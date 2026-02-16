@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check",
-    "format": "biome format --write",
+    "lint": "biome check --write",
     "test": "pnpm test:unit",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"
