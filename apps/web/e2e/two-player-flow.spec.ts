@@ -155,6 +155,36 @@ test("create/join + single mode full match", async ({ browser }) => {
   }
 });
 
+test("language toggle mid-flow keeps two-player game playable", async ({ browser }) => {
+  const session = await createAndJoinRoom(browser, "AliceLocale", "BobLocale");
+
+  try {
+    await session.pageA.getByTestId("lang-toggle-ko").click();
+    await expect(session.pageA.locator("html")).toHaveAttribute("lang", "ko", {
+      timeout: UI_TIMEOUT_MS,
+    });
+
+    await session.pageA.getByTestId("lang-toggle-en").click();
+    await expect(session.pageA.locator("html")).toHaveAttribute("lang", "en", {
+      timeout: UI_TIMEOUT_MS,
+    });
+
+    await startMatch(session.pageA, session.pageB, session.roomId, "single");
+
+    await expect(session.pageA.getByTestId("choice-rock")).toHaveText("Rock", {
+      timeout: WS_TIMEOUT_MS,
+    });
+
+    await playHostWinningRound(session.pageA, session.pageB);
+
+    await expect(session.pageA.locator("html")).toHaveAttribute("lang", "en", {
+      timeout: UI_TIMEOUT_MS,
+    });
+  } finally {
+    await closePlayerSession(session);
+  }
+});
+
 test("best_of_3 full match", async ({ browser }) => {
   const session = await createAndJoinRoom(browser, "AliceBo3", "BobBo3");
 
