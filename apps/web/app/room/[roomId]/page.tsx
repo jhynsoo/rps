@@ -2,9 +2,11 @@
 
 import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import type { GameMode } from "@/lib/rps";
+import { gameStatusMessage } from "@/lib/rps-i18n";
 import { useGameStore } from "@/store/game-store";
 
 type PlayerLike = {
@@ -30,16 +32,33 @@ function getState(room: Room | null): MyRoomStateLike | null {
   return room.state as MyRoomStateLike;
 }
 
-const MODES: Array<{ mode: GameMode; label: string; testId: string }> = [
-  { mode: "single", label: "Single", testId: "mode-single" },
-  { mode: "best_of_3", label: "Best of 3", testId: "mode-bo3" },
-  { mode: "best_of_5", label: "Best of 5", testId: "mode-bo5" },
+type MessageDescriptor = {
+  key: string;
+  values?: Record<string, string | number>;
+};
+
+function translateMessage(
+  t: (key: string, values?: Record<string, string | number>) => string,
+  message: MessageDescriptor,
+) {
+  return message.values ? t(message.key, message.values) : t(message.key);
+}
+
+const MODES: Array<{ mode: GameMode; testId: string }> = [
+  { mode: "single", testId: "mode-single" },
+  { mode: "best_of_3", testId: "mode-bo3" },
+  { mode: "best_of_5", testId: "mode-bo5" },
 ];
 
 export default function RoomLobbyPage() {
   const router = useRouter();
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? "";
+
+  const tRoom = useTranslations("room");
+  const tGame = useTranslations("game");
+  const tGameMessage = (key: string, values?: Record<string, string | number>) =>
+    values ? tGame(key as never, values as never) : tGame(key as never);
 
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
@@ -91,21 +110,25 @@ export default function RoomLobbyPage() {
     setCopyFeedback(null);
     try {
       await navigator.clipboard.writeText(roomId);
-      setCopyFeedback("Copied");
+      setCopyFeedback(tRoom("code.copySuccess"));
       window.setTimeout(() => setCopyFeedback(null), 1200);
     } catch {
-      setCopyFeedback("Copy failed");
+      setCopyFeedback(tRoom("code.copyFail"));
       window.setTimeout(() => setCopyFeedback(null), 1200);
     }
   }
 
   if (!room || !state || isMismatch) {
-    const title = !room ? "No active room" : isMismatch ? "Room mismatch" : "Room unavailable";
-    const detail = !room
-      ? "This page requires an active room in memory. Reconnect on refresh is not supported."
+    const title = !room
+      ? tRoom("waiting.errorNoActiveRoom")
       : isMismatch
-        ? `Active room is ${storeRoomId ?? "-"} but URL is ${roomId || "-"}.`
-        : "Room state is missing.";
+        ? tRoom("waiting.errorMismatch")
+        : tRoom("waiting.errorUnavailable");
+    const detail = !room
+      ? tRoom("waiting.detailNeedsReconnect")
+      : isMismatch
+        ? tGame("detailMismatch", { activeRoomId: storeRoomId ?? "-", urlRoomId: roomId || "-" })
+        : tRoom("waiting.detailMissingState");
 
     return (
       <main className="min-h-dvh bg-background text-foreground">
@@ -113,7 +136,7 @@ export default function RoomLobbyPage() {
         <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
-              <p className="font-mono text-xs text-muted-foreground">Room</p>
+              <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
               <h1 className="mt-1 font-mono text-2xl tracking-tight">{title}</h1>
               <p className="mt-3 text-sm text-muted-foreground">{detail}</p>
               <button
@@ -123,7 +146,7 @@ export default function RoomLobbyPage() {
                 }}
                 className="mt-6 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span>Back to lobby</span>
+                <span>{tRoom("status.backToLobby")}</span>
                 <span className="font-mono text-xs opacity-70">/lobby</span>
               </button>
             </div>
@@ -132,6 +155,8 @@ export default function RoomLobbyPage() {
       </main>
     );
   }
+
+  const gameStatusLabel = translateMessage(tGameMessage, gameStatusMessage(state.gameStatus));
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -142,10 +167,10 @@ export default function RoomLobbyPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">Room</h1>
+                <p className="font-mono text-xs text-muted-foreground">{tRoom("title")}</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">{tRoom("waiting.title")}</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Status: <span className="text-foreground">{state.gameStatus}</span>
+                  {tGame("statusLabel")}: <span className="text-foreground">{gameStatusLabel}</span>
                 </p>
               </div>
               <button
@@ -155,23 +180,25 @@ export default function RoomLobbyPage() {
                 }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
-                Leave
+                {tRoom("status.leave")}
               </button>
             </div>
 
-            {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
+            {leaveError ? (
+              <p className="mt-4 text-sm text-destructive">{tGame(leaveError as never)}</p>
+            ) : null}
 
             {!leaveError && opponentLeft ? (
               <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="font-mono text-xs text-muted-foreground">Status</p>
-                <p className="mt-1 text-sm text-foreground">Opponent left</p>
+                <p className="font-mono text-xs text-muted-foreground">{tGame("statusLabel")}</p>
+                <p className="mt-1 text-sm text-foreground">{tGame("opponentLeft")}</p>
               </div>
             ) : null}
 
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Room code</p>
+                  <p className="text-xs font-medium text-muted-foreground">{tRoom("code.label")}</p>
                   <p className="mt-1 truncate font-mono text-lg">{roomId || "-"}</p>
                 </div>
                 <button
@@ -179,16 +206,17 @@ export default function RoomLobbyPage() {
                   onClick={onCopyRoomCode}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-xs font-medium shadow-sm transition enabled:hover:brightness-110"
                 >
-                  {copyFeedback ?? "Copy"}
+                  {copyFeedback ?? tRoom("code.copy")}
                 </button>
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
-                Players: <span className="text-foreground">{state.players.size}/2</span>
+                {tRoom("code.players")}:{" "}
+                <span className="text-foreground">{state.players.size}/2</span>
               </p>
             </div>
 
             <div className="mt-6">
-              <p className="text-xs font-medium text-muted-foreground">Players</p>
+              <p className="text-xs font-medium text-muted-foreground">{tRoom("code.players")}</p>
               <ul
                 data-testid="player-list"
                 className="mt-3 grid gap-2 rounded-2xl border border-border bg-background/60 p-4"
@@ -198,7 +226,7 @@ export default function RoomLobbyPage() {
                   return (
                     <li key={p.sessionId} className="flex items-center justify-between gap-3">
                       <span className="min-w-0 truncate font-mono text-sm">
-                        {p.nickname || "Player"}
+                        {p.nickname || tGame("playerFallback")}
                       </span>
                       <span className="flex items-center gap-2">
                         {isHostPlayer ? (
@@ -206,7 +234,7 @@ export default function RoomLobbyPage() {
                             data-testid="host-badge"
                             className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground/80"
                           >
-                            Host
+                            {tRoom("ready.hostBadge")}
                           </span>
                         ) : null}
                         <span className="text-xs text-muted-foreground">
@@ -220,7 +248,7 @@ export default function RoomLobbyPage() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
-              <p className="text-xs font-medium text-muted-foreground">Game mode</p>
+              <p className="text-xs font-medium text-muted-foreground">{tRoom("ready.label")}</p>
 
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {MODES.map((m) => {
@@ -240,7 +268,7 @@ export default function RoomLobbyPage() {
                           : "bg-card text-foreground enabled:hover:brightness-110")
                       }
                     >
-                      {m.label}
+                      {tRoom(`ready.mode.${m.mode}` as never)}
                     </button>
                   );
                 })}
@@ -256,19 +284,17 @@ export default function RoomLobbyPage() {
                 }}
                 className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span>{isHost ? "Start game" : "Waiting for host"}</span>
+                <span>{isHost ? tRoom("ready.start") : tRoom("ready.disabled")}</span>
                 <span className="font-mono text-xs opacity-70">
-                  {isHost ? "select_mode" : "disabled"}
+                  {isHost ? tRoom("ready.actionSelectMode") : tRoom("ready.actionDisabled")}
                 </span>
               </button>
 
               {!isHost ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Only the host can start the game.
-                </p>
+                <p className="mt-3 text-xs text-muted-foreground">{tRoom("ready.hostOnly")}</p>
               ) : state.gameStatus !== "mode_select" ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Waiting for both players to join.
+                  {tRoom("ready.waitingPlayers")}
                 </p>
               ) : null}
             </div>

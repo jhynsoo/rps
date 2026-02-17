@@ -7,11 +7,13 @@ type GameStoreState = {
   room: Room | null;
   roomId: string | null;
   roomVersion: number;
-  leaveError: string | null;
+  leaveError: "errors.serverUnavailable" | null;
   setRoom: (room: Room) => void;
   clearRoom: () => void;
   leaveRoom: () => Promise<void>;
 };
+
+export const leaveErrorDisconnected = "errors.serverUnavailable" as const;
 
 const listenersAttached = new WeakSet<Room>();
 
@@ -36,7 +38,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     room.onLeave(() => {
       set((s) => {
         if (s.room !== room) return s;
-        return { ...s, leaveError: "Disconnected from server." };
+        return { ...s, leaveError: leaveErrorDisconnected };
       });
     });
   },

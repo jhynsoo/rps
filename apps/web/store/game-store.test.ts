@@ -1,7 +1,6 @@
 import type { Room } from "colyseus.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useGameStore } from "@/store/game-store";
+import { leaveErrorDisconnected, useGameStore } from "@/store/game-store";
 
 type RoomCallback = () => void;
 
@@ -51,6 +50,6 @@ describe("useGameStore", () => {
     useGameStore.getState().setRoom(mockRoom.room);
     mockRoom.emitLeave();
 
-    expect(useGameStore.getState().leaveError).toBe("Disconnected from server.");
+    expect(useGameStore.getState().leaveError).toBe(leaveErrorDisconnected);
   });
 });
