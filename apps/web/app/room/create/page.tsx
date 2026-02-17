@@ -2,6 +2,7 @@
 
 import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createRoom } from "@/lib/colyseus-client";
@@ -15,6 +16,8 @@ function sanitizeNickname(raw: string) {
 
 export default function CreateRoomPage() {
   const router = useRouter();
+  const t = useTranslations("room");
+  const tGame = useTranslations("game");
   const setRoom = useGameStore((s) => s.setRoom);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   const roomVersion = useGameStore((s) => s.roomVersion);
@@ -78,7 +81,7 @@ export default function CreateRoomPage() {
         router.replace(`/room/${created.roomId}`);
       } catch (e) {
         if (!active) return;
-        setError(e instanceof Error ? e.message : "Failed to create room.");
+        setError(e instanceof Error ? e.message : t("create.failed"));
       }
     }
 
@@ -91,15 +94,15 @@ export default function CreateRoomPage() {
 
       if (current && !transferredRef.current) void leaveRoom();
     };
-  }, [nickname, leaveRoom, router, setRoom]);
+  }, [nickname, leaveRoom, router, setRoom, t]);
 
   const roomId = room?.roomId ?? "";
   const statusLine = useMemo(() => {
     if (error || leaveError) return "";
-    if (!room) return "Creating room...";
-    if (playersCount < 2) return "Waiting for opponent...";
-    return "Opponent joined.";
-  }, [error, leaveError, playersCount, room]);
+    if (!room) return t("status.creating");
+    if (playersCount < 2) return t("status.waiting");
+    return t("status.opponentJoined");
+  }, [error, leaveError, playersCount, room, t]);
 
   async function onCopy() {
     if (!roomId) return;
@@ -107,10 +110,10 @@ export default function CreateRoomPage() {
 
     try {
       await navigator.clipboard.writeText(roomId);
-      setCopyFeedback("Copied");
+      setCopyFeedback(t("code.copySuccess"));
       window.setTimeout(() => setCopyFeedback(null), 1200);
     } catch {
-      setCopyFeedback("Copy failed");
+      setCopyFeedback(t("code.copyFail"));
       window.setTimeout(() => setCopyFeedback(null), 1200);
     }
   }
@@ -124,9 +127,9 @@ export default function CreateRoomPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">Create room</h1>
-                <p className="mt-2 text-sm text-muted-foreground">Creating a room...</p>
+                <p className="font-mono text-xs text-muted-foreground">{t("title")}</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">{t("create.title")}</h1>
+                <p className="mt-2 text-sm text-muted-foreground">{t("create.subtitle")}</p>
               </div>
               <button
                 type="button"
@@ -135,14 +138,14 @@ export default function CreateRoomPage() {
                 }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
-                Back
+                {t("status.back")}
               </button>
             </div>
 
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Room code</p>
+                  <p className="text-xs font-medium text-muted-foreground">{t("code.label")}</p>
                   <p data-testid="roomid-display" className="mt-1 truncate font-mono text-lg">
                     {roomId || "-"}
                   </p>
@@ -154,18 +157,18 @@ export default function CreateRoomPage() {
                   disabled={!roomId}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-xs font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50"
                 >
-                  {copyFeedback ?? "Copy"}
+                  {copyFeedback ?? t("code.copy")}
                 </button>
               </div>
 
               <div className="mt-4 grid gap-1 text-sm">
                 <p className="text-muted-foreground">
-                  Players: <span className="text-foreground">{playersCount}/2</span>
+                  {t("code.players")}: <span className="text-foreground">{playersCount}/2</span>
                 </p>
                 {error ? (
                   <p className="text-destructive">{error}</p>
                 ) : leaveError ? (
-                  <p className="text-destructive">{leaveError}</p>
+                  <p className="text-destructive">{tGame(leaveError as never)}</p>
                 ) : (
                   <p className="text-muted-foreground">{statusLine}</p>
                 )}
@@ -182,13 +185,13 @@ export default function CreateRoomPage() {
               }}
               className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span>Continue</span>
+              <span>{t("create.continue")}</span>
               <span className="font-mono text-xs opacity-70">/room/{roomId || "-"}</span>
             </button>
 
             {nickname ? (
               <p className="mt-4 text-xs text-muted-foreground">
-                You are <span className="font-mono text-foreground">{nickname}</span>.
+                {t("create.youAre")} <span className="font-mono text-foreground">{nickname}</span>.
               </p>
             ) : null}
           </div>

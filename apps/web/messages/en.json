@@ -1,0 +1,151 @@
+{
+  "lang": {
+    "ko": "Korean",
+    "en": "English"
+  },
+  "home": {
+    "title": "RPS",
+    "nicknamePrompt": "Pick a nickname",
+    "nicknameDescription": "Used for rooms and match results. You can change it anytime.",
+    "nicknameLabel": "Nickname (max 12 chars)",
+    "nicknamePlaceholder": "e.g. StoneHand",
+    "nicknameWhitespaceHint": "Leading/trailing spaces are ignored.",
+    "nicknameRequired": "Nickname is required",
+    "continue": "Continue",
+    "enterHint": "Enter"
+  },
+  "lobby": {
+    "title": "Lobby",
+    "subtitle": "Choose how you want to play.",
+    "welcome": "Welcome, {nickname}",
+    "loading": "Loading...",
+    "editNickname": "Edit nickname",
+    "privateRoom": "Private Room",
+    "quickMatch": "Quick match",
+    "quickMatchHint": "Coming soon",
+    "createRoom": "Create room",
+    "joinRoom": "Join room",
+    "room": "Room"
+  },
+  "room": {
+    "title": "Private Room",
+    "status": {
+      "creating": "Creating room...",
+      "waiting": "Waiting for opponent...",
+      "opponentJoined": "Opponent joined.",
+      "back": "Back",
+      "backToLobby": "Back to lobby",
+      "leave": "Leave"
+    },
+    "code": {
+      "label": "Room code",
+      "placeholder": "e.g. Y6s9mE9J",
+      "players": "Players",
+      "copy": "Copy",
+      "copySuccess": "Copied",
+      "copyFail": "Copy failed"
+    },
+    "create": {
+      "title": "Create room",
+      "subtitle": "Creating a room...",
+      "continue": "Continue",
+      "failed": "Failed to create room.",
+      "youAre": "You are"
+    },
+    "join": {
+      "title": "Join room",
+      "subtitle": "Enter a room code to join.",
+      "roomIdRequired": "Room code is required",
+      "submit": "Join",
+      "submitLoading": "Joining..."
+    },
+    "waiting": {
+      "title": "Room",
+      "errorNoActiveRoom": "No active room",
+      "errorMismatch": "Room mismatch",
+      "errorUnavailable": "Room unavailable",
+      "detailMissingState": "Room state is missing.",
+      "detailNeedsReconnect": "This page requires an active room in memory. Reconnect on refresh is not supported."
+    },
+    "ready": {
+      "hostOnly": "Only the host can start the game.",
+      "waitingPlayers": "Waiting for both players to join.",
+      "hostBadge": "Host",
+      "actionSelectMode": "Select mode",
+      "actionDisabled": "Disabled",
+      "mode": {
+        "single": "Single",
+        "best_of_3": "Best of 3",
+        "best_of_5": "Best of 5"
+      },
+      "start": "Start game",
+      "disabled": "Waiting for host",
+      "label": "Game mode"
+    }
+  },
+  "game": {
+    "title": "Game",
+    "errorNoActiveRoom": "No active room",
+    "errorMismatch": "Room mismatch",
+    "errorUnavailable": "Room unavailable",
+    "detailNeedsReconnect": "This page requires an active room in memory. Reconnect on refresh is not supported.",
+    "detailMismatch": "Active room is {activeRoomId} but URL is {urlRoomId}.",
+    "detailMissingState": "Room state is missing.",
+    "statusLabel": "Status",
+    "modeLabel": "Mode",
+    "status": {
+      "waiting": "Waiting",
+      "mode_select": "Mode selection",
+      "choosing": "Choosing",
+      "result": "Result",
+      "finished": "Finished",
+      "unknown": "Unknown status: {status}"
+    },
+    "mode": {
+      "single": "Single",
+      "best_of_3": "Best of 3",
+      "best_of_5": "Best of 5",
+      "unknown": "Unknown mode: {mode}"
+    },
+    "backToLobby": "Back to lobby",
+    "backToRoom": "Back to room",
+    "roundLabel": "Round",
+    "countdownLabel": "Countdown",
+    "opponentLeft": "Opponent left",
+    "yourChoiceLabel": "Your choice",
+    "roundResult": "Round result",
+    "matchResult": "Match result",
+    "scoreLabel": "Score",
+    "rematchLabel": "Rematch",
+    "playerFallback": "Player",
+    "ready": "Ready",
+    "cancel": "Cancel",
+    "choices": {
+      "rock": "Rock",
+      "paper": "Paper",
+      "scissors": "Scissors",
+      "unknown": "Unknown choice: {choice}"
+    },
+    "state": {
+      "pickOne": "Pick one.",
+      "waitNextRound": "Waiting for next round.",
+      "locked": "Locked: {choice}",
+      "sending": "Sending: {choice}",
+      "winner": "Winner: {winner}",
+      "readyCount": "Ready: {ready}/{total}"
+    },
+    "errors": {
+      "draw": "Draw",
+      "serverUnavailable": "Server is unavailable.",
+      "roomNotFound": "Room not found.",
+      "roomFull": "Room is full.",
+      "createFailed": "Failed to create room.",
+      "joinFailed": "Failed to join room."
+    }
+  },
+  "common": {
+    "continue": "Continue",
+    "next": "Next",
+    "copy": "Copy"
+  }
+}

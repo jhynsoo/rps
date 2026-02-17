@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 const NICKNAME_STORAGE_KEY = "rps:nickname";
@@ -11,6 +12,7 @@ function sanitizeNickname(raw: string) {
 
 export default function Home() {
   const router = useRouter();
+  const t = useTranslations("home");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [nickname, setNickname] = useState("");
   const [touched, setTouched] = useState(false);
@@ -22,9 +24,9 @@ export default function Home() {
 
   const validationMessage = useMemo(() => {
     if (!touched) return null;
-    if (sanitizeNickname(nickname).length === 0) return "Nickname is required";
+    if (sanitizeNickname(nickname).length === 0) return t("nicknameRequired");
     return null;
-  }, [nickname, touched]);
+  }, [nickname, touched, t]);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,20 +50,20 @@ export default function Home() {
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="inline-flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl border border-border bg-card shadow-sm">
-              <span className="font-mono text-lg">RPS</span>
+              <span className="font-mono text-lg">{t("title")}</span>
             </div>
             <div>
-              <h1 className="font-mono text-2xl tracking-tight">Pick a nickname</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Used for rooms and match results. You can change it anytime.
-              </p>
+              <h1 className="font-mono text-2xl tracking-tight" data-testid="home-nickname-prompt">
+                {t("nicknamePrompt")}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">{t("nicknameDescription")}</p>
             </div>
           </div>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-3">
             <div className="space-y-2">
               <label htmlFor="nickname" className="text-xs font-medium text-muted-foreground">
-                Nickname (max 12 chars)
+                {t("nicknameLabel")}
               </label>
               <input
                 ref={inputRef}
@@ -70,7 +72,7 @@ export default function Home() {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 onBlur={() => setTouched(true)}
-                placeholder="e.g. StoneHand"
+                placeholder={t("nicknamePlaceholder")}
                 autoComplete="nickname"
                 maxLength={64}
                 data-testid="nickname-input"
@@ -79,9 +81,7 @@ export default function Home() {
               {validationMessage ? (
                 <p className="text-xs text-destructive">{validationMessage}</p>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  Leading/trailing spaces are ignored.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("nicknameWhitespaceHint")}</p>
               )}
             </div>
 
@@ -90,9 +90,9 @@ export default function Home() {
               data-testid="nickname-submit"
               className="group inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span>Continue</span>
+              <span>{t("continue")}</span>
               <span className="font-mono text-xs opacity-70 transition group-hover:opacity-100">
-                Enter
+                {t("enterHint")}
               </span>
             </button>
           </form>

@@ -1,6 +1,7 @@
 "use client";
 import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { joinRoomById } from "@/lib/colyseus-client";
@@ -12,22 +13,11 @@ function sanitizeNickname(raw: string) {
   return raw.trim().slice(0, 12);
 }
 
-function formatJoinError(e: unknown) {
-  const raw = e instanceof Error ? e.message : String(e);
-  const msg = raw.trim();
-  if (!msg) return "Failed to join room.";
-
-  if (/full|maxClients|seat|locked/i.test(msg)) return "Room is full.";
-  if (/not found|roomId|invalid|no such/i.test(msg)) return "Room not found.";
-  if (/connect|websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out/i.test(msg)) {
-    return "Server is unavailable.";
-  }
-
-  return msg;
-}
-
 export default function JoinRoomPage() {
   const router = useRouter();
+  const t = useTranslations("room");
+  const tGame = useTranslations("game");
+  const tHome = useTranslations("home");
   const setRoom = useGameStore((s) => s.setRoom);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   const leaveError = useGameStore((s) => s.leaveError);
@@ -69,9 +59,27 @@ export default function JoinRoomPage() {
 
   const validationMessage = useMemo(() => {
     if (!touched) return null;
-    if (roomIdInput.trim().length === 0) return "Room code is required";
+    if (roomIdInput.trim().length === 0) return t("join.roomIdRequired");
     return null;
-  }, [roomIdInput, touched]);
+  }, [roomIdInput, touched, t]);
+
+  function formatJoinError(e: unknown) {
+    const raw = e instanceof Error ? e.message : String(e);
+    const msg = raw.trim();
+    if (!msg) return tGame("errors.joinFailed");
+
+    if (/full|maxClients|seat|locked/i.test(msg)) {
+      return tGame("errors.roomFull");
+    }
+    if (/not found|roomId|invalid|no such/i.test(msg)) {
+      return tGame("errors.roomNotFound");
+    }
+    if (/connect|websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out/i.test(msg)) {
+      return tGame("errors.serverUnavailable");
+    }
+
+    return msg;
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -113,7 +121,7 @@ export default function JoinRoomPage() {
     }
   }
 
-  const headerLine = "Enter a room code to join.";
+  const headerLine = t("join.subtitle");
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -124,8 +132,8 @@ export default function JoinRoomPage() {
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs text-muted-foreground">Private Room</p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">Join room</h1>
+                <p className="font-mono text-xs text-muted-foreground">{t("title")}</p>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">{t("join.title")}</h1>
                 <p className="mt-2 text-sm text-muted-foreground">{headerLine}</p>
               </div>
               <button
@@ -135,14 +143,14 @@ export default function JoinRoomPage() {
                 }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
-                Back
+                {t("status.back")}
               </button>
             </div>
 
             <form onSubmit={onSubmit} className="mt-6 space-y-3">
               <div className="space-y-2">
                 <label htmlFor="roomId" className="text-xs font-medium text-muted-foreground">
-                  Room code
+                  {t("code.label")}
                 </label>
                 <input
                   ref={inputRef}
@@ -151,7 +159,7 @@ export default function JoinRoomPage() {
                   value={roomIdInput}
                   onChange={(e) => setRoomIdInput(e.target.value)}
                   onBlur={() => setTouched(true)}
-                  placeholder="e.g. Y6s9mE9J"
+                  placeholder={t("code.placeholder")}
                   autoComplete="off"
                   inputMode="text"
                   spellCheck={false}
@@ -161,9 +169,7 @@ export default function JoinRoomPage() {
                 {validationMessage ? (
                   <p className="text-xs text-destructive">{validationMessage}</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Leading/trailing spaces are ignored.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{tHome("nicknameWhitespaceHint")}</p>
                 )}
               </div>
 
@@ -173,8 +179,8 @@ export default function JoinRoomPage() {
                 disabled={joining || !nickname}
                 className="inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span>{joining ? "Joining..." : "Join"}</span>
-                <span className="font-mono text-xs opacity-70">Enter</span>
+                <span>{joining ? t("join.submitLoading") : t("join.submit")}</span>
+                <span className="font-mono text-xs opacity-70">{tHome("enterHint")}</span>
               </button>
             </form>
 
@@ -184,11 +190,13 @@ export default function JoinRoomPage() {
               </p>
             ) : null}
 
-            {leaveError ? <p className="mt-4 text-sm text-destructive">{leaveError}</p> : null}
+            {leaveError ? (
+              <p className="mt-4 text-sm text-destructive">{tGame(leaveError as never)}</p>
+            ) : null}
 
             {nickname ? (
               <p className="mt-4 text-xs text-muted-foreground">
-                You are <span className="font-mono text-foreground">{nickname}</span>.
+                {t("create.youAre")} <span className="font-mono text-foreground">{nickname}</span>.
               </p>
             ) : null}
           </div>

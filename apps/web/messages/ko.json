@@ -1,0 +1,151 @@
+{
+  "lang": {
+    "ko": "한국어",
+    "en": "English"
+  },
+  "home": {
+    "title": "RPS",
+    "nicknamePrompt": "닉네임을 정해주세요",
+    "nicknameDescription": "방 및 경기 결과에 사용됩니다. 언제든지 변경할 수 있습니다.",
+    "nicknameLabel": "닉네임 (최대 12자)",
+    "nicknamePlaceholder": "예: StoneHand",
+    "nicknameWhitespaceHint": "앞뒤 공백은 무시됩니다.",
+    "nicknameRequired": "닉네임을 입력하세요",
+    "continue": "계속",
+    "enterHint": "Enter"
+  },
+  "lobby": {
+    "title": "로비",
+    "subtitle": "플레이 방법을 선택하세요.",
+    "welcome": "환영합니다, {nickname}",
+    "loading": "로딩 중...",
+    "editNickname": "닉네임 수정",
+    "privateRoom": "비공개 방",
+    "quickMatch": "빠른 매치",
+    "quickMatchHint": "준비 중",
+    "createRoom": "방 만들기",
+    "joinRoom": "방 참가",
+    "room": "방"
+  },
+  "room": {
+    "title": "비공개 방",
+    "status": {
+      "creating": "방을 생성하고 있습니다...",
+      "waiting": "상대 접속 대기 중...",
+      "opponentJoined": "상대가 참가했습니다.",
+      "back": "뒤로 가기",
+      "backToLobby": "로비로 돌아가기",
+      "leave": "나가기"
+    },
+    "code": {
+      "label": "방 코드",
+      "placeholder": "예: Y6s9mE9J",
+      "players": "참가자",
+      "copy": "복사",
+      "copySuccess": "복사됨",
+      "copyFail": "복사 실패"
+    },
+    "create": {
+      "title": "방 만들기",
+      "subtitle": "방을 생성하고 있습니다...",
+      "continue": "계속",
+      "failed": "방 생성에 실패했습니다.",
+      "youAre": "당신은"
+    },
+    "join": {
+      "title": "방 참가",
+      "subtitle": "참가할 방 코드를 입력하세요.",
+      "roomIdRequired": "방 코드가 필요합니다.",
+      "submit": "입장",
+      "submitLoading": "입장 중..."
+    },
+    "waiting": {
+      "title": "방",
+      "errorNoActiveRoom": "활성 방이 없습니다",
+      "errorMismatch": "방 정보가 일치하지 않습니다",
+      "errorUnavailable": "방에 접속할 수 없습니다",
+      "detailMissingState": "방 상태 정보가 없습니다.",
+      "detailNeedsReconnect": "이 화면은 메모리에 저장된 방이 필요합니다. 새로고침은 재접속을 지원하지 않습니다."
+    },
+    "ready": {
+      "hostOnly": "방장만 게임을 시작할 수 있습니다.",
+      "waitingPlayers": "두 명 모두 입장할 때까지 대기 중입니다.",
+      "hostBadge": "방장",
+      "actionSelectMode": "모드 선택",
+      "actionDisabled": "비활성",
+      "mode": {
+        "single": "단판",
+        "best_of_3": "3판 2선",
+        "best_of_5": "5판 3선"
+      },
+      "start": "게임 시작",
+      "disabled": "방장 대기 중",
+      "label": "게임 모드"
+    }
+  },
+  "game": {
+    "title": "게임",
+    "errorNoActiveRoom": "활성 방이 없습니다",
+    "errorMismatch": "방 정보가 일치하지 않습니다",
+    "errorUnavailable": "방에 접속할 수 없습니다",
+    "detailNeedsReconnect": "이 화면은 메모리에 저장된 방이 필요합니다. 새로고침은 재접속을 지원하지 않습니다.",
+    "detailMismatch": "활성 방은 {activeRoomId}이고 URL은 {urlRoomId}입니다.",
+    "detailMissingState": "방 상태 정보가 없습니다.",
+    "statusLabel": "상태",
+    "modeLabel": "모드",
+    "status": {
+      "waiting": "대기",
+      "mode_select": "모드 선택",
+      "choosing": "선택 중",
+      "result": "결과",
+      "finished": "종료",
+      "unknown": "알 수 없는 상태: {status}"
+    },
+    "mode": {
+      "single": "단판",
+      "best_of_3": "3판 2선",
+      "best_of_5": "5판 3선",
+      "unknown": "알 수 없는 모드: {mode}"
+    },
+    "backToLobby": "로비로 돌아가기",
+    "backToRoom": "방으로 돌아가기",
+    "roundLabel": "라운드",
+    "countdownLabel": "카운트다운",
+    "opponentLeft": "상대가 나갔습니다",
+    "yourChoiceLabel": "선택",
+    "roundResult": "라운드 결과",
+    "matchResult": "경기 결과",
+    "scoreLabel": "점수",
+    "rematchLabel": "리매치",
+    "playerFallback": "플레이어",
+    "ready": "준비",
+    "cancel": "취소",
+    "choices": {
+      "rock": "바위",
+      "paper": "보",
+      "scissors": "가위",
+      "unknown": "알 수 없는 선택: {choice}"
+    },
+    "state": {
+      "pickOne": "한 개를 선택하세요.",
+      "waitNextRound": "다음 라운드를 기다리는 중입니다.",
+      "locked": "선택 완료: {choice}",
+      "sending": "전송 중: {choice}",
+      "winner": "승자: {winner}",
+      "readyCount": "준비 완료: {ready}/{total}"
+    },
+    "errors": {
+      "draw": "무승부",
+      "serverUnavailable": "서버에 연결할 수 없습니다.",
+      "roomNotFound": "방을 찾을 수 없습니다.",
+      "roomFull": "방이 가득 찼습니다.",
+      "createFailed": "방 생성에 실패했습니다.",
+      "joinFailed": "방 참가에 실패했습니다."
+    }
+  },
+  "common": {
+    "continue": "계속",
+    "next": "다음",
+    "copy": "복사"
+  }
+}
