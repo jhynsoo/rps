@@ -1,0 +1,11 @@
+services:
+  server:
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 2567
+    ports:
+      - "2567:2567"
+    restart: unless-stopped
