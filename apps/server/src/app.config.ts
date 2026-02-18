@@ -1,6 +1,7 @@
 import { monitor } from "@colyseus/monitor";
 import { playground } from "@colyseus/playground";
 import config from "@colyseus/tools";
+import { matchMaker } from "colyseus";
 
 import {
   recordJoin,
@@ -14,6 +15,38 @@ import {
  * Import your Room files
  */
 import { MyRoom } from "./rooms/MyRoom";
+
+function parseAllowedOrigins(rawValue: string | undefined): string[] {
+  if (!rawValue) {
+    return [];
+  }
+
+  return rawValue
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+const allowedOrigins = parseAllowedOrigins(process.env.MATCHMAKER_ALLOWED_ORIGINS);
+
+if (allowedOrigins.length > 0) {
+  const allowedOriginSet = new Set(allowedOrigins);
+
+  matchMaker.controller.getCorsHeaders = (request) => {
+    const originHeader = request.headers.origin;
+    const requestOrigin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+
+    const allowedOrigin =
+      typeof requestOrigin === "string" && allowedOriginSet.has(requestOrigin)
+        ? requestOrigin
+        : allowedOrigins[0];
+
+    return {
+      "Access-Control-Allow-Origin": allowedOrigin,
+      Vary: "Origin",
+    };
+  };
+}
 
 export default config({
   initializeGameServer: (gameServer) => {
