@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import type { RpsChoice } from "@/lib/rps";
 import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
+import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
 
 type PlayerLike = {
@@ -63,13 +64,12 @@ export default function GamePage() {
 
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
-  const roomVersion = useGameStore((s) => s.roomVersion);
   const leaveError = useGameStore((s) => s.leaveError);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
+  useRoomStateVersion(room);
 
   const state = getState(room);
   const isMismatch = !!storeRoomId && storeRoomId !== roomId;
-  void roomVersion;
 
   const players = state ? Array.from(state.players.values()) : [];
   const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;

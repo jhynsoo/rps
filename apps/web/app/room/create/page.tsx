@@ -6,12 +6,21 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createRoom } from "@/lib/colyseus-client";
+import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
 
-const NICKNAME_STORAGE_KEY = "rps:nickname";
+type RoomStateLike = {
+  players?: {
+    size?: number;
+  };
+};
 
-function sanitizeNickname(raw: string) {
-  return raw.trim().slice(0, 12);
+function readPlayersCount(room: Room | null): number {
+  if (!room) return 0;
+
+  const state = room.state as RoomStateLike | undefined;
+  return state?.players?.size ?? 0;
 }
 
 export default function CreateRoomPage() {
@@ -20,29 +29,16 @@ export default function CreateRoomPage() {
   const tGame = useTranslations("game");
   const setRoom = useGameStore((s) => s.setRoom);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
-  const roomVersion = useGameStore((s) => s.roomVersion);
   const leaveError = useGameStore((s) => s.leaveError);
 
   const [nickname, setNickname] = useState<string | null>(null);
   const [room, setRoomLocal] = useState<Room | null>(null);
   const roomRef = useRef<Room | null>(null);
   const transferredRef = useRef(false);
-  const [playersCount, setPlayersCount] = useState(0);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!room) return;
-    void roomVersion;
-    const state = room.state as
-      | {
-          players?: {
-            size?: number;
-          };
-        }
-      | undefined;
-    setPlayersCount(state?.players?.size ?? 0);
-  }, [room, roomVersion]);
+  useRoomStateVersion(room);
+  const playersCount = readPlayersCount(room);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(NICKNAME_STORAGE_KEY);

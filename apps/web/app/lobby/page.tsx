@@ -4,11 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
-const NICKNAME_STORAGE_KEY = "rps:nickname";
-
-function sanitizeNickname(raw: string) {
-  return raw.trim().slice(0, 12);
-}
+import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
 
 export default function LobbyPage() {
   const router = useRouter();

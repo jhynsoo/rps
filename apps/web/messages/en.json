@@ -1,13 +1,14 @@
 {
   "lang": {
     "ko": "Korean",
-    "en": "English"
+    "en": "English",
+    "changeFailed": "Failed to change language."
   },
   "home": {
     "title": "RPS",
     "nicknamePrompt": "Pick a nickname",
     "nicknameDescription": "Used for rooms and match results. You can change it anytime.",
-    "nicknameLabel": "Nickname (max 12 chars)",
+    "nicknameLabel": "Nickname (max {max} chars)",
     "nicknamePlaceholder": "e.g. StoneHand",
     "nicknameWhitespaceHint": "Leading/trailing spaces are ignored.",
     "nicknameRequired": "Nickname is required",
@@ -56,6 +57,7 @@
       "title": "Join room",
       "subtitle": "Enter a room code to join.",
       "roomIdRequired": "Room code is required",
+      "roomIdHint": "Leading and trailing spaces are trimmed.",
       "submit": "Join",
       "submitLoading": "Joining..."
     },

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { GameMode } from "@/lib/rps";
 import { gameStatusMessage } from "@/lib/rps-i18n";
+import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
 
 type PlayerLike = {
@@ -62,13 +63,12 @@ export default function RoomLobbyPage() {
 
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
-  const roomVersion = useGameStore((s) => s.roomVersion);
   const leaveError = useGameStore((s) => s.leaveError);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
+  useRoomStateVersion(room);
 
   const state = getState(room);
   const isMismatch = !!storeRoomId && storeRoomId !== roomId;
-  void roomVersion;
 
   const players = state ? Array.from(state.players.values()) : [];
   const isHost = !!room && !!state && room.sessionId === state.hostSessionId;

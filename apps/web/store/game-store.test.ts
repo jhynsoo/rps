@@ -33,15 +33,12 @@ describe("useGameStore", () => {
     useGameStore.getState().clearRoom();
   });
 
-  it("sets roomId and increments roomVersion on state changes", () => {
+  it("sets roomId when a room is attached", () => {
     const mockRoom = createMockRoom("room-123");
 
     useGameStore.getState().setRoom(mockRoom.room);
     expect(useGameStore.getState().roomId).toBe("room-123");
-    expect(useGameStore.getState().roomVersion).toBe(0);
-
-    mockRoom.emitStateChange();
-    expect(useGameStore.getState().roomVersion).toBe(1);
+    expect(useGameStore.getState().room).toBe(mockRoom.room);
   });
 
   it("stores leaveError when room leave callback fires", () => {

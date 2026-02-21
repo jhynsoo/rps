@@ -6,7 +6,6 @@ import { create } from "zustand";
 type GameStoreState = {
   room: Room | null;
   roomId: string | null;
-  roomVersion: number;
   leaveError: "errors.serverUnavailable" | null;
   setRoom: (room: Room) => void;
   clearRoom: () => void;
@@ -15,25 +14,17 @@ type GameStoreState = {
 
 export const leaveErrorDisconnected = "errors.serverUnavailable" as const;
 
-const listenersAttached = new WeakSet<Room>();
+const leaveListenersAttached = new WeakSet<Room>();
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
   room: null,
   roomId: null,
-  roomVersion: 0,
   leaveError: null,
   setRoom: (room) => {
-    set({ room, roomId: room.roomId, roomVersion: 0, leaveError: null });
+    set({ room, roomId: room.roomId, leaveError: null });
 
-    if (listenersAttached.has(room)) return;
-    listenersAttached.add(room);
-
-    room.onStateChange(() => {
-      set((s) => {
-        if (s.room !== room) return s;
-        return { ...s, roomVersion: s.roomVersion + 1 };
-      });
-    });
+    if (leaveListenersAttached.has(room)) return;
+    leaveListenersAttached.add(room);
 
     room.onLeave(() => {
       set((s) => {
@@ -43,11 +34,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
   clearRoom: () => {
-    set({ room: null, roomId: null, roomVersion: 0, leaveError: null });
+    set({ room: null, roomId: null, leaveError: null });
   },
   leaveRoom: async () => {
     const current = get().room;
-    set({ room: null, roomId: null, roomVersion: 0, leaveError: null });
+    set({ room: null, roomId: null, leaveError: null });
     if (current) await current.leave();
   },
 }));

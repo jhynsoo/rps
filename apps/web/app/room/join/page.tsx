@@ -5,13 +5,8 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { joinRoomById } from "@/lib/colyseus-client";
+import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
 import { useGameStore } from "@/store/game-store";
-
-const NICKNAME_STORAGE_KEY = "rps:nickname";
-
-function sanitizeNickname(raw: string) {
-  return raw.trim().slice(0, 12);
-}
 
 export default function JoinRoomPage() {
   const router = useRouter();
@@ -169,7 +164,7 @@ export default function JoinRoomPage() {
                 {validationMessage ? (
                   <p className="text-xs text-destructive">{validationMessage}</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">{tHome("nicknameWhitespaceHint")}</p>
+                  <p className="text-xs text-muted-foreground">{t("join.roomIdHint")}</p>
                 )}
               </div>
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/locale/route";
 
@@ -16,9 +16,14 @@ const postLocale = async (payload: unknown) =>
 describe("POST /api/locale", () => {
   it("sets locale=en for valid input", async () => {
     const response = await postLocale({ locale: "en" });
+    const setCookie = response.headers.get("set-cookie") ?? "";
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("set-cookie")).toContain("locale=en");
+    expect(setCookie).toContain("locale=en");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).toContain("SameSite=lax");
+    expect(setCookie).toContain("Max-Age=31536000");
+    expect(setCookie).not.toContain("Secure");
   });
 
   it("normalizes invalid locale input to ko", async () => {
@@ -37,5 +42,20 @@ describe("POST /api/locale", () => {
 
     expect(emptyLocaleResponse.status).toBe(204);
     expect(emptyLocaleResponse.headers.get("set-cookie")).toContain("locale=ko");
+  });
+
+  it("sets Secure cookie in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    try {
+      const response = await postLocale({ locale: "en" });
+      const setCookie = response.headers.get("set-cookie") ?? "";
+
+      expect(response.status).toBe(204);
+      expect(setCookie).toContain("locale=en");
+      expect(setCookie).toContain("Secure");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

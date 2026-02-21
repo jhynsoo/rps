@@ -1,13 +1,14 @@
 {
   "lang": {
     "ko": "한국어",
-    "en": "English"
+    "en": "English",
+    "changeFailed": "언어 변경에 실패했습니다."
   },
   "home": {
     "title": "RPS",
     "nicknamePrompt": "닉네임을 정해주세요",
     "nicknameDescription": "방 및 경기 결과에 사용됩니다. 언제든지 변경할 수 있습니다.",
-    "nicknameLabel": "닉네임 (최대 12자)",
+    "nicknameLabel": "닉네임 (최대 {max}자)",
     "nicknamePlaceholder": "예: StoneHand",
     "nicknameWhitespaceHint": "앞뒤 공백은 무시됩니다.",
     "nicknameRequired": "닉네임을 입력하세요",
@@ -56,6 +57,7 @@
       "title": "방 참가",
       "subtitle": "참가할 방 코드를 입력하세요.",
       "roomIdRequired": "방 코드가 필요합니다.",
+      "roomIdHint": "앞뒤 공백은 자동으로 제거됩니다.",
       "submit": "입장",
       "submitLoading": "입장 중..."
     },

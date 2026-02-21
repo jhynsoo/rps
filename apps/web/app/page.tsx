@@ -4,11 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-const NICKNAME_STORAGE_KEY = "rps:nickname";
-
-function sanitizeNickname(raw: string) {
-  return raw.trim().slice(0, 12);
-}
+import { MAX_NICKNAME_LENGTH, NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
 
 export default function Home() {
   const router = useRouter();
@@ -63,7 +59,7 @@ export default function Home() {
           <form onSubmit={onSubmit} className="mt-8 space-y-3">
             <div className="space-y-2">
               <label htmlFor="nickname" className="text-xs font-medium text-muted-foreground">
-                {t("nicknameLabel")}
+                {t("nicknameLabel", { max: MAX_NICKNAME_LENGTH })}
               </label>
               <input
                 ref={inputRef}
@@ -74,7 +70,7 @@ export default function Home() {
                 onBlur={() => setTouched(true)}
                 placeholder={t("nicknamePlaceholder")}
                 autoComplete="nickname"
-                maxLength={64}
+                maxLength={MAX_NICKNAME_LENGTH}
                 data-testid="nickname-input"
                 className="h-12 w-full rounded-xl border border-border bg-card px-4 text-base shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
               />
