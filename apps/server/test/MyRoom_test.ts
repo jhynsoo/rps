@@ -169,6 +169,25 @@ describe("testing your Colyseus app", () => {
         assert.ok(true);
       }
     });
+
+    it("room unlocks when one player leaves so replacement can join", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+
+      await client1.leave();
+      await room.waitForNextPatch();
+
+      const client3 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+      assert.ok(room.state.players.get(client2.sessionId));
+      assert.ok(room.state.players.get(client3.sessionId));
+    });
   });
 
   describe("Game Mode Selection Tests", () => {
@@ -208,6 +227,22 @@ describe("testing your Colyseus app", () => {
 
       client1.send("select_mode", { mode: "invalid_mode" });
       await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+    });
+
+    it("malformed select_mode payload is ignored", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      (client1 as unknown as { send: (type: string, message: unknown) => void }).send(
+        "select_mode",
+        null,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       assert.strictEqual(room.state.gameMode, "");
       assert.strictEqual(room.state.gameStatus, "mode_select");
@@ -267,6 +302,26 @@ describe("testing your Colyseus app", () => {
 
       const player1 = room.state.players.get(client1.sessionId);
       assert.strictEqual(player1?.choice, "");
+    });
+
+    it("malformed choice payload is ignored", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const _client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      (client1 as unknown as { send: (type: string, message: unknown) => void }).send(
+        "choice",
+        null,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const player1 = room.state.players.get(client1.sessionId);
+      assert.strictEqual(player1?.choice, "");
+      assert.strictEqual(room.state.gameStatus, "choosing");
     });
 
     it("choice is ignored when not in choosing state", async () => {
@@ -491,6 +546,43 @@ describe("testing your Colyseus app", () => {
 
       assert.strictEqual(room.state.gameStatus, "finished");
       assert.strictEqual(room.state.winner, client2.sessionId);
+    });
+
+    it("replacement player join resets stale match state", async function () {
+      this.timeout(12000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send("select_mode", { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send("choice", { choice: "rock" });
+      client2.send("choice", { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 1);
+
+      await client2.leave();
+      await room.waitForNextPatch();
+
+      const client3 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.roundNumber, 1);
+      assert.strictEqual(room.state.winner, "");
+      assert.strictEqual(room.state.countdown, 0);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.score, 0);
+      assert.strictEqual(room.state.players.get(client3.sessionId)?.score, 0);
+      assert.strictEqual(room.state.players.get(client1.sessionId)?.choice, "");
+      assert.strictEqual(room.state.players.get(client3.sessionId)?.choice, "");
     });
 
     it("result timeout is cleared after leave to avoid later mutation", async function () {

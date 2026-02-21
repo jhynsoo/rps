@@ -2,6 +2,7 @@ import { monitor } from "@colyseus/monitor";
 import { playground } from "@colyseus/playground";
 import config from "@colyseus/tools";
 import { matchMaker } from "colyseus";
+import type { RequestHandler } from "express";
 
 import {
   recordJoin,
@@ -28,6 +29,54 @@ function parseAllowedOrigins(rawValue: string | undefined): string[] {
 }
 
 const allowedOrigins = parseAllowedOrigins(process.env.MATCHMAKER_ALLOWED_ORIGINS);
+
+function decodeBasicAuthorizationHeader(value: string | undefined): {
+  username: string;
+  password: string;
+} | null {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.trim().split(/\s+/, 2);
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const [scheme, token] = parts;
+  if (scheme.toLowerCase() !== "basic") {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(token, "base64").toString("utf8");
+    const separatorIndex = decoded.indexOf(":");
+    if (separatorIndex === -1) {
+      return null;
+    }
+
+    return {
+      username: decoded.slice(0, separatorIndex),
+      password: decoded.slice(separatorIndex + 1),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createMonitorAuthMiddleware(username: string, password: string): RequestHandler {
+  return (req, res, next) => {
+    const credentials = decodeBasicAuthorizationHeader(req.headers.authorization);
+
+    if (credentials?.username === username && credentials.password === password) {
+      next();
+      return;
+    }
+
+    res.setHeader("WWW-Authenticate", 'Basic realm="Colyseus Monitor"');
+    res.status(401).send("Authentication required");
+  };
+}
 
 if (allowedOrigins.length > 0) {
   const allowedOriginSet = new Set(allowedOrigins);
@@ -84,12 +133,23 @@ export default config({
       app.use("/", playground());
     }
 
-    /**
-     * Use @colyseus/monitor
-     * It is recommended to protect this route with a password
-     * Read more: https://docs.colyseus.io/tools/monitor/#restrict-access-to-the-panel-using-a-password
-     */
-    app.use("/monitor", monitor());
+    const isProduction = process.env.NODE_ENV === "production";
+    const monitorUsername = process.env.MONITOR_USERNAME;
+    const monitorPassword = process.env.MONITOR_PASSWORD;
+
+    if (!isProduction) {
+      app.use("/monitor", monitor());
+      return;
+    }
+
+    if (monitorUsername && monitorPassword) {
+      app.use("/monitor", createMonitorAuthMiddleware(monitorUsername, monitorPassword), monitor());
+      return;
+    }
+
+    console.warn(
+      "[monitor] disabled in production: set MONITOR_USERNAME and MONITOR_PASSWORD to enable.",
+    );
   },
 
   beforeListen: () => {

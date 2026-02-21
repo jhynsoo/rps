@@ -10,6 +10,20 @@ const WIN_MAP: Record<string, string> = {
   paper: "rock",
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isSelectModeMessage(value: unknown): value is { mode: string } {
+  if (!isRecord(value)) return false;
+  return typeof value.mode === "string";
+}
+
+function isChoiceMessage(value: unknown): value is { choice: string } {
+  if (!isRecord(value)) return false;
+  return typeof value.choice === "string";
+}
+
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 2;
   private countdownInterval: Delayed | null = null;
@@ -18,17 +32,19 @@ export class MyRoom extends Room<MyRoomState> {
   onCreate(_options: unknown) {
     this.setState(new MyRoomState());
 
-    this.onMessage("select_mode", (client, message: { mode: string }) => {
+    this.onMessage("select_mode", (client, message: unknown) => {
       if (this.state.gameStatus !== "mode_select") return;
       if (client.sessionId !== this.state.hostSessionId) return;
+      if (!isSelectModeMessage(message)) return;
       if (!VALID_MODES.includes(message.mode)) return;
 
       this.state.gameMode = message.mode;
       this.startChoosingPhase();
     });
 
-    this.onMessage("choice", (client, message: { choice: string }) => {
+    this.onMessage("choice", (client, message: unknown) => {
       if (this.state.gameStatus !== "choosing") return;
+      if (!isChoiceMessage(message)) return;
       if (!VALID_CHOICES.includes(message.choice)) return;
 
       const player = this.state.players.get(client.sessionId);
@@ -88,6 +104,15 @@ export class MyRoom extends Room<MyRoomState> {
     }
   }
 
+  private syncRoomLock() {
+    if (this.state.players.size >= this.maxClients) {
+      this.lock();
+      return;
+    }
+
+    this.unlock();
+  }
+
   private maybeResetToLobby() {
     if (this.state.gameStatus !== "finished") return;
     if (this.state.players.size !== 2) return;
@@ -103,6 +128,7 @@ export class MyRoom extends Room<MyRoomState> {
   }
 
   private resetMatchState() {
+    this.stopResultTimeout();
     this.stopCountdown();
 
     this.state.players.forEach((player) => {
@@ -116,6 +142,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.state.countdown = 0;
     this.state.gameMode = "";
     this.state.gameStatus = this.state.players.size === 2 ? "mode_select" : "waiting";
+    this.syncRoomLock();
   }
 
   private assignRandomChoices() {
@@ -141,6 +168,8 @@ export class MyRoom extends Room<MyRoomState> {
 
   private determineWinner() {
     const players = Array.from(this.state.players.values());
+    if (players.length < 2) return;
+
     const p1 = players[0];
     const p2 = players[1];
 
@@ -213,10 +242,12 @@ export class MyRoom extends Room<MyRoomState> {
       this.state.hostSessionId = firstPlayer?.sessionId ?? "";
     }
 
-    if (this.state.players.size === 2) {
-      this.state.gameStatus = "mode_select";
-      this.lock();
+    if (this.state.players.size === this.maxClients) {
+      this.resetMatchState();
+      return;
     }
+
+    this.syncRoomLock();
   }
 
   onLeave(client: Client, _consented: boolean) {
@@ -241,6 +272,7 @@ export class MyRoom extends Room<MyRoomState> {
     this.state.players.delete(client.sessionId);
 
     if (this.state.players.size === 0) {
+      this.resetMatchState();
       this.state.hostSessionId = "";
       return;
     }
@@ -249,6 +281,8 @@ export class MyRoom extends Room<MyRoomState> {
       const nextHost = this.state.players.values().next().value as Player | undefined;
       this.state.hostSessionId = nextHost?.sessionId ?? "";
     }
+
+    this.syncRoomLock();
   }
 
   onDispose() {
