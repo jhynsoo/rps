@@ -1,5 +1,6 @@
 services:
-  server:
+  rps-server:
+    container_name: rps-server
     build:
       context: ./apps/server
       dockerfile: Dockerfile
