@@ -66,8 +66,10 @@
       "errorNoActiveRoom": "활성 방이 없습니다",
       "errorMismatch": "방 정보가 일치하지 않습니다",
       "errorUnavailable": "방에 접속할 수 없습니다",
+      "reconnecting": "재연결 시도 중...",
       "detailMissingState": "방 상태 정보가 없습니다.",
-      "detailNeedsReconnect": "이 화면은 메모리에 저장된 방이 필요합니다. 새로고침은 재접속을 지원하지 않습니다."
+      "detailNeedsReconnect": "활성 방 정보를 찾을 수 없습니다. 방에 다시 입장해 주세요.",
+      "detailReconnectExpired": "재연결 토큰이 만료되었습니다. 방에 다시 입장해 주세요."
     },
     "ready": {
       "hostOnly": "방장만 게임을 시작할 수 있습니다.",
@@ -87,10 +89,12 @@
   },
   "game": {
     "title": "게임",
+    "reconnecting": "재연결 시도 중...",
     "errorNoActiveRoom": "활성 방이 없습니다",
     "errorMismatch": "방 정보가 일치하지 않습니다",
     "errorUnavailable": "방에 접속할 수 없습니다",
-    "detailNeedsReconnect": "이 화면은 메모리에 저장된 방이 필요합니다. 새로고침은 재접속을 지원하지 않습니다.",
+    "detailNeedsReconnect": "활성 방 정보를 찾을 수 없습니다. 방에 다시 입장해 주세요.",
+    "detailReconnectExpired": "재연결 토큰이 만료되었습니다. 방에 다시 입장해 주세요.",
     "detailMismatch": "활성 방은 {activeRoomId}이고 URL은 {urlRoomId}입니다.",
     "detailMissingState": "방 상태 정보가 없습니다.",
     "statusLabel": "상태",

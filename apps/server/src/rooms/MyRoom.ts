@@ -1,8 +1,14 @@
 import { type Client, type Delayed, Room } from "colyseus";
+import {
+  CLIENT_MESSAGE_TYPES,
+  GAME_MODES,
+  RECONNECT_GRACE_SECONDS,
+  RPS_CHOICES,
+} from "@rps/contracts";
 import { MyRoomState, Player } from "./schema/MyRoomState";
 
-const VALID_MODES = ["single", "best_of_3", "best_of_5"];
-const VALID_CHOICES = ["rock", "paper", "scissors"];
+const VALID_MODES = GAME_MODES as readonly string[];
+const VALID_CHOICES = RPS_CHOICES as readonly string[];
 
 const WIN_MAP: Record<string, string> = {
   rock: "scissors",
@@ -32,7 +38,7 @@ export class MyRoom extends Room<MyRoomState> {
   onCreate(_options: unknown) {
     this.setState(new MyRoomState());
 
-    this.onMessage("select_mode", (client, message: unknown) => {
+    this.onMessage(CLIENT_MESSAGE_TYPES.SELECT_MODE, (client, message: unknown) => {
       if (this.state.gameStatus !== "mode_select") return;
       if (client.sessionId !== this.state.hostSessionId) return;
       if (!isSelectModeMessage(message)) return;
@@ -42,7 +48,7 @@ export class MyRoom extends Room<MyRoomState> {
       this.startChoosingPhase();
     });
 
-    this.onMessage("choice", (client, message: unknown) => {
+    this.onMessage(CLIENT_MESSAGE_TYPES.CHOICE, (client, message: unknown) => {
       if (this.state.gameStatus !== "choosing") return;
       if (!isChoiceMessage(message)) return;
       if (!VALID_CHOICES.includes(message.choice)) return;
@@ -55,7 +61,7 @@ export class MyRoom extends Room<MyRoomState> {
       this.checkBothPlayersChosen();
     });
 
-    this.onMessage("rematch_ready", (client) => {
+    this.onMessage(CLIENT_MESSAGE_TYPES.REMATCH_READY, (client) => {
       if (this.state.gameStatus !== "finished") return;
 
       const player = this.state.players.get(client.sessionId);
@@ -65,7 +71,7 @@ export class MyRoom extends Room<MyRoomState> {
       this.maybeResetToLobby();
     });
 
-    this.onMessage("rematch_cancel", (client) => {
+    this.onMessage(CLIENT_MESSAGE_TYPES.REMATCH_CANCEL, (client) => {
       if (this.state.gameStatus !== "finished") return;
 
       const player = this.state.players.get(client.sessionId);
@@ -184,11 +190,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     this.state.gameStatus = "result";
-
-    this.resultTimeout = this.clock.setTimeout(() => {
-      this.resultTimeout = null;
-      this.handleRoundEnd();
-    }, 3000);
+    this.scheduleResultTimeout();
   }
 
   private stopResultTimeout() {
@@ -196,6 +198,78 @@ export class MyRoom extends Room<MyRoomState> {
       this.resultTimeout.clear();
       this.resultTimeout = null;
     }
+  }
+
+  private scheduleResultTimeout(delayMs = 3000) {
+    this.stopResultTimeout();
+    this.resultTimeout = this.clock.setTimeout(() => {
+      this.resultTimeout = null;
+      this.handleRoundEnd();
+    }, delayMs);
+  }
+
+  private resumeChoosingCountdown() {
+    if (this.state.gameStatus !== "choosing") return;
+    if (this.countdownInterval) return;
+    if (this.state.players.size !== 2) return;
+
+    if (this.state.countdown <= 0) {
+      this.assignRandomChoices();
+      this.determineWinner();
+      return;
+    }
+
+    this.countdownInterval = this.clock.setInterval(() => {
+      this.state.countdown -= 1;
+
+      if (this.state.countdown <= 0) {
+        this.stopCountdown();
+        this.assignRandomChoices();
+        this.determineWinner();
+      }
+    }, 1000);
+  }
+
+  private shouldAllowGracefulReconnection(consented: boolean): boolean {
+    if (consented) return false;
+    if (this.state.players.size !== 2) return false;
+
+    return (
+      this.state.gameStatus === "mode_select" ||
+      this.state.gameStatus === "choosing" ||
+      this.state.gameStatus === "result"
+    );
+  }
+
+  private finalizePlayerLeave(sessionId: string) {
+    const isGameInProgress =
+      this.state.gameStatus !== "waiting" && this.state.gameStatus !== "finished";
+
+    if (isGameInProgress && this.state.players.size === 2) {
+      this.stopCountdown();
+
+      const remainingPlayer = Array.from(this.state.players.values()).find((p) => p.sessionId !== sessionId);
+
+      if (remainingPlayer) {
+        this.state.winner = remainingPlayer.sessionId;
+        this.state.gameStatus = "finished";
+      }
+    }
+
+    this.state.players.delete(sessionId);
+
+    if (this.state.players.size === 0) {
+      this.resetMatchState();
+      this.state.hostSessionId = "";
+      return;
+    }
+
+    if (!this.state.players.has(this.state.hostSessionId)) {
+      const nextHost = this.state.players.values().next().value as Player | undefined;
+      this.state.hostSessionId = nextHost?.sessionId ?? "";
+    }
+
+    this.syncRoomLock();
   }
 
   private getWinThreshold(): number {
@@ -250,39 +324,34 @@ export class MyRoom extends Room<MyRoomState> {
     this.syncRoomLock();
   }
 
-  onLeave(client: Client, _consented: boolean) {
+  async onLeave(client: Client, consented: boolean) {
+    const canReconnect = this.shouldAllowGracefulReconnection(consented);
+    const statusBeforeLeave = this.state.gameStatus;
+
     this.stopResultTimeout();
-
-    const isGameInProgress =
-      this.state.gameStatus !== "waiting" && this.state.gameStatus !== "finished";
-
-    if (isGameInProgress && this.state.players.size === 2) {
+    if (statusBeforeLeave === "choosing") {
       this.stopCountdown();
+    }
 
-      const remainingPlayer = Array.from(this.state.players.values()).find(
-        (p) => p.sessionId !== client.sessionId,
-      );
+    if (canReconnect) {
+      try {
+        await this.allowReconnection(client, RECONNECT_GRACE_SECONDS);
 
-      if (remainingPlayer) {
-        this.state.winner = remainingPlayer.sessionId;
-        this.state.gameStatus = "finished";
+        if (this.state.gameStatus === "choosing") {
+          this.resumeChoosingCountdown();
+        } else if (this.state.gameStatus === "result") {
+          this.scheduleResultTimeout();
+        } else {
+          this.syncRoomLock();
+        }
+
+        return;
+      } catch {
+        // reconnect timeout/invalid token -> finalize leave below
       }
     }
 
-    this.state.players.delete(client.sessionId);
-
-    if (this.state.players.size === 0) {
-      this.resetMatchState();
-      this.state.hostSessionId = "";
-      return;
-    }
-
-    if (!this.state.players.has(this.state.hostSessionId)) {
-      const nextHost = this.state.players.values().next().value as Player | undefined;
-      this.state.hostSessionId = nextHost?.sessionId ?? "";
-    }
-
-    this.syncRoomLock();
+    this.finalizePlayerLeave(client.sessionId);
   }
 
   onDispose() {

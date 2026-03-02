@@ -30,6 +30,22 @@ function parseAllowedOrigins(rawValue: string | undefined): string[] {
 
 const allowedOrigins = parseAllowedOrigins(process.env.MATCHMAKER_ALLOWED_ORIGINS);
 
+export function resolveAllowedOrigin(
+  requestOrigin: string | undefined,
+  allowedOriginList: readonly string[],
+): string | undefined {
+  if (allowedOriginList.length === 0) return undefined;
+  if (typeof requestOrigin !== "string") return undefined;
+  return allowedOriginList.includes(requestOrigin) ? requestOrigin : undefined;
+}
+
+export function isProductionMonitorEnabled(
+  monitorUsername: string | undefined,
+  monitorPassword: string | undefined,
+): boolean {
+  return Boolean(monitorUsername && monitorPassword);
+}
+
 function decodeBasicAuthorizationHeader(value: string | undefined): {
   username: string;
   password: string;
@@ -79,21 +95,20 @@ function createMonitorAuthMiddleware(username: string, password: string): Reques
 }
 
 if (allowedOrigins.length > 0) {
-  const allowedOriginSet = new Set(allowedOrigins);
-
   matchMaker.controller.getCorsHeaders = (request) => {
     const originHeader = request.headers.origin;
     const requestOrigin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
 
-    const allowedOrigin =
-      typeof requestOrigin === "string" && allowedOriginSet.has(requestOrigin)
-        ? requestOrigin
-        : allowedOrigins[0];
-
-    return {
-      "Access-Control-Allow-Origin": allowedOrigin,
+    const allowedOrigin = resolveAllowedOrigin(requestOrigin, allowedOrigins);
+    const headers: Record<string, string> = {
       Vary: "Origin",
     };
+
+    if (allowedOrigin) {
+      headers["Access-Control-Allow-Origin"] = allowedOrigin;
+    }
+
+    return headers;
   };
 }
 
@@ -142,7 +157,7 @@ export default config({
       return;
     }
 
-    if (monitorUsername && monitorPassword) {
+    if (isProductionMonitorEnabled(monitorUsername, monitorPassword)) {
       app.use("/monitor", createMonitorAuthMiddleware(monitorUsername, monitorPassword), monitor());
       return;
     }

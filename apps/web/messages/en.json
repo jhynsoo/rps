@@ -66,8 +66,10 @@
       "errorNoActiveRoom": "No active room",
       "errorMismatch": "Room mismatch",
       "errorUnavailable": "Room unavailable",
+      "reconnecting": "Reconnecting...",
       "detailMissingState": "Room state is missing.",
-      "detailNeedsReconnect": "This page requires an active room in memory. Reconnect on refresh is not supported."
+      "detailNeedsReconnect": "No active room snapshot was found. Please join the room again.",
+      "detailReconnectExpired": "Reconnect token expired. Please join the room again."
     },
     "ready": {
       "hostOnly": "Only the host can start the game.",
@@ -87,10 +89,12 @@
   },
   "game": {
     "title": "Game",
+    "reconnecting": "Reconnecting...",
     "errorNoActiveRoom": "No active room",
     "errorMismatch": "Room mismatch",
     "errorUnavailable": "Room unavailable",
-    "detailNeedsReconnect": "This page requires an active room in memory. Reconnect on refresh is not supported.",
+    "detailNeedsReconnect": "No active room snapshot was found. Please join the room again.",
+    "detailReconnectExpired": "Reconnect token expired. Please join the room again.",
     "detailMismatch": "Active room is {activeRoomId} but URL is {urlRoomId}.",
     "detailMissingState": "Room state is missing.",
     "statusLabel": "Status",

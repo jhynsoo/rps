@@ -6,7 +6,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { joinRoomById } from "@/lib/colyseus-client";
 import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
-import { useGameStore } from "@/store/game-store";
+import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
 export default function JoinRoomPage() {
   const router = useRouter();
@@ -171,7 +171,11 @@ export default function JoinRoomPage() {
               <button
                 type="submit"
                 data-testid="join-submit"
-                disabled={joining || !nickname}
+                disabled={
+                  joining ||
+                  !nickname ||
+                  isActionBlockedByLeaveError("join-submit", leaveError)
+                }
                 className="inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>{joining ? t("join.submitLoading") : t("join.submit")}</span>

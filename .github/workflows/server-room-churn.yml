@@ -1,20 +1,24 @@
-name: Server Room Churn Baseline
+name: PR Test Gate
 
 on:
   pull_request:
     paths:
       - 'apps/server/**'
-      - '.github/workflows/server-room-churn.yml'
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/**'
   push:
     branches:
       - 'main'
     paths:
       - 'apps/server/**'
-      - '.github/workflows/server-room-churn.yml'
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/**'
 
 jobs:
-  room-churn-baseline:
-    name: Run server churn baseline
+  server-tests:
+    name: Server tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -32,17 +36,27 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run server baseline tests
+      - name: Run server test suite
         run: npm -C apps/server test
 
-      - name: Upload room churn artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
+  web-unit-tests:
+    name: Web unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
         with:
-          name: server-room-churn-artifacts
-          path: |
-            apps/server/**/*.log
-            apps/server/*churn*.log
-            apps/server/churn-logs/**
-            apps/server/test-results/**
-          if-no-files-found: ignore
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.9.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run web unit test suite
+        run: pnpm -C apps/web test:unit

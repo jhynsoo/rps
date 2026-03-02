@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
+import { CLIENT_MESSAGE_TYPES, RECONNECT_GRACE_SECONDS } from "@rps/contracts";
 
 import appConfig from "../src/app.config";
 import { MyRoomState, Player } from "../src/rooms/schema/MyRoomState";
@@ -614,6 +615,125 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.gameStatus, "finished");
       assert.strictEqual(room.state.winner, client2.sessionId);
       assert.strictEqual(room.state.roundNumber, 1);
+    });
+  });
+
+  describe("Reconnection Grace Tests", () => {
+    it("resumes choosing phase when reconnecting within grace period", async function () {
+      this.timeout(20000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "choosing");
+
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const countdownBeforeDisconnect = room.state.countdown;
+      const reconnectToken = client1.reconnectionToken;
+
+      await client1.leave(false);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.strictEqual(room.state.countdown, countdownBeforeDisconnect);
+
+      const reconnectedClient = await colyseus.sdk.reconnect<MyRoomState>(reconnectToken);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+      assert.strictEqual(room.state.gameStatus, "choosing");
+      assert.ok(room.state.countdown <= countdownBeforeDisconnect);
+
+      reconnectedClient.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "rock" });
+      client2.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "scissors" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "result");
+    });
+
+    it("finalizes match when choosing reconnect grace expires", async function () {
+      this.timeout(25000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "choosing");
+
+      const reconnectToken = client1.reconnectionToken;
+      await client1.leave(false);
+
+      await new Promise((resolve) => setTimeout(resolve, (RECONNECT_GRACE_SECONDS + 1) * 1000));
+
+      assert.strictEqual(room.state.players.size, 1);
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+      await assert.rejects(() => colyseus.sdk.reconnect<MyRoomState>(reconnectToken));
+    });
+
+    it("reschedules result timeout when reconnecting during result phase", async function () {
+      this.timeout(20000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "rock" });
+      client2.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "scissors" });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.gameStatus, "result");
+      const reconnectToken = client1.reconnectionToken;
+
+      await client1.leave(false);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      assert.strictEqual(room.state.gameStatus, "result");
+      const reconnectedClient = await colyseus.sdk.reconnect<MyRoomState>(reconnectToken);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 2);
+      assert.strictEqual(reconnectedClient.sessionId, client1.sessionId);
+
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client1.sessionId);
+    });
+
+    it("finalizes match when result-phase reconnect grace expires", async function () {
+      this.timeout(25000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+      await room.waitForNextPatch();
+
+      client1.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "rock" });
+      client2.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "scissors" });
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "result");
+
+      const reconnectToken = client1.reconnectionToken;
+      await client1.leave(false);
+      await new Promise((resolve) => setTimeout(resolve, (RECONNECT_GRACE_SECONDS + 1) * 1000));
+
+      assert.strictEqual(room.state.players.size, 1);
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+      await assert.rejects(() => colyseus.sdk.reconnect<MyRoomState>(reconnectToken));
     });
   });
 

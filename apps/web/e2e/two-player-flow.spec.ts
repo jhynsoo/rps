@@ -1,3 +1,4 @@
+import { Client as ColyseusClient } from "colyseus.js";
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 const UI_TIMEOUT_MS = 10_000;
@@ -261,5 +262,47 @@ test("invalid roomId shows room error", async ({ browser }) => {
     });
   } finally {
     await context.close();
+  }
+});
+
+test("reconnect resume with token restores active game session", async ({ browser }) => {
+  const session = await createAndJoinRoom(browser, "AliceReconnect", "BobReconnect");
+
+  try {
+    await startMatch(session.pageA, session.pageB, session.roomId, "single");
+
+    await session.pageA.evaluate(() => {
+      window.dispatchEvent(new Event("rps:force-disconnect"));
+    });
+
+    await expect
+      .poll(
+        async () =>
+          session.pageA.evaluate(() => window.localStorage.getItem("rps:reconnect:v1")),
+        { timeout: WS_TIMEOUT_MS },
+      )
+      .not.toBeNull();
+
+    const reconnectSnapshot = await session.pageA.evaluate(() =>
+      window.localStorage.getItem("rps:reconnect:v1"),
+    );
+    if (!reconnectSnapshot) {
+      throw new Error("Reconnect snapshot missing from localStorage");
+    }
+
+    const parsedSnapshot = JSON.parse(reconnectSnapshot) as { token: string };
+    const reconnectClient = new ColyseusClient("ws://127.0.0.1:2567");
+    const resumedRoom = await reconnectClient.reconnect(parsedSnapshot.token);
+
+    resumedRoom.send("choice", { choice: "rock" });
+    await session.pageB.getByTestId("choice-scissors").click();
+
+    await expect(session.pageB.getByTestId("round-winner")).toBeVisible({
+      timeout: WS_TIMEOUT_MS,
+    });
+
+    await resumedRoom.leave();
+  } finally {
+    await closePlayerSession(session);
   }
 });

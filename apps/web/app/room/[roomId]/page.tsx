@@ -1,6 +1,7 @@
 "use client";
 
 import type { Room } from "colyseus.js";
+import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
@@ -8,25 +9,10 @@ import { useEffect, useRef, useState } from "react";
 import type { GameMode } from "@/lib/rps";
 import { gameStatusMessage } from "@/lib/rps-i18n";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
-import { useGameStore } from "@/store/game-store";
+import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
-type PlayerLike = {
-  sessionId: string;
-  nickname: string;
-  choice: string;
-  score: number;
-  isReady: boolean;
-};
-
-type MyRoomStateLike = {
-  players: {
-    size: number;
-    values: () => IterableIterator<PlayerLike>;
-  };
-  hostSessionId: string;
-  gameStatus: string;
-  gameMode: string;
-};
+type PlayerLike = PlayerStateView;
+type MyRoomStateLike = Pick<RoomStateView, "players" | "hostSessionId" | "gameStatus" | "gameMode">;
 
 function getState(room: Room | null): MyRoomStateLike | null {
   if (!room) return null;
@@ -64,6 +50,9 @@ export default function RoomLobbyPage() {
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
   const leaveError = useGameStore((s) => s.leaveError);
+  const reconnectState = useGameStore((s) => s.reconnectState);
+  const reconnectError = useGameStore((s) => s.reconnectError);
+  const attemptReconnect = useGameStore((s) => s.attemptReconnect);
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   useRoomStateVersion(room);
 
@@ -73,9 +62,16 @@ export default function RoomLobbyPage() {
   const players = state ? Array.from(state.players.values()) : [];
   const isHost = !!room && !!state && room.sessionId === state.hostSessionId;
 
-  const canControl = !!state && isHost && state.gameStatus === "mode_select";
+  const canSendRealtimeActions = !isActionBlockedByLeaveError("mode-select", leaveError);
+  const canControl =
+    !!state &&
+    isHost &&
+    state.gameStatus === "mode_select" &&
+    canSendRealtimeActions &&
+    !isActionBlockedByLeaveError("start-game", leaveError);
   const [selectedMode, setSelectedMode] = useState<GameMode>("single");
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const reconnectAttemptedRef = useRef(false);
 
   const hadTwoPlayersRef = useRef(false);
   const [opponentLeft, setOpponentLeft] = useState(false);
@@ -96,6 +92,22 @@ export default function RoomLobbyPage() {
     if (!roomId) return;
     router.replace(`/game/${roomId}`);
   }, [gameStatus, roomId, router]);
+
+  useEffect(() => {
+    if (room) return;
+    if (!roomId) return;
+    if (storeRoomId && storeRoomId !== roomId) return;
+    if (reconnectAttemptedRef.current) return;
+
+    reconnectAttemptedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void attemptReconnect(roomId);
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [attemptReconnect, room, roomId, storeRoomId]);
 
   async function onBackToLobby() {
     try {
@@ -118,6 +130,22 @@ export default function RoomLobbyPage() {
     }
   }
 
+  if (!room && reconnectState === "trying" && !isMismatch) {
+    return (
+      <main className="min-h-dvh bg-background text-foreground">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+              <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">{tRoom("waiting.reconnecting")}</h1>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!room || !state || isMismatch) {
     const title = !room
       ? tRoom("waiting.errorNoActiveRoom")
@@ -125,7 +153,9 @@ export default function RoomLobbyPage() {
         ? tRoom("waiting.errorMismatch")
         : tRoom("waiting.errorUnavailable");
     const detail = !room
-      ? tRoom("waiting.detailNeedsReconnect")
+      ? reconnectError === "expired"
+        ? tRoom("waiting.detailReconnectExpired")
+        : tRoom("waiting.detailNeedsReconnect")
       : isMismatch
         ? tGame("detailMismatch", { activeRoomId: storeRoomId ?? "-", urlRoomId: roomId || "-" })
         : tRoom("waiting.detailMissingState");
@@ -253,7 +283,7 @@ export default function RoomLobbyPage() {
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {MODES.map((m) => {
                   const active = selectedMode === m.mode;
-                  const disabled = !isHost;
+                  const disabled = !isHost || !canSendRealtimeActions;
                   return (
                     <button
                       key={m.mode}
@@ -280,7 +310,7 @@ export default function RoomLobbyPage() {
                 disabled={!canControl}
                 onClick={() => {
                   if (!canControl) return;
-                  room.send("select_mode", { mode: selectedMode });
+                  room.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: selectedMode });
                 }}
                 className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
