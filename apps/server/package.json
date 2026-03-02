@@ -5,7 +5,7 @@
   "description": "npm init template for bootstrapping an empty Colyseus project",
   "main": "build/index.js",
   "engines": {
-    "node": ">= 20.9.0"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -15,6 +15,7 @@
     "loadtest": "tsx loadtest/example.ts --room my_room --numClients 2",
     "loadtest:ci": "tsx loadtest/ci.ts",
     "build": "npm run clean && tsc",
+    "check-types": "tsc --noEmit",
     "clean": "rimraf build",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
