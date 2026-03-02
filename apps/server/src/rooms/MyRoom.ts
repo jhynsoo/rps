@@ -234,11 +234,7 @@ export class MyRoom extends Room<MyRoomState> {
     if (consented) return false;
     if (this.state.players.size !== 2) return false;
 
-    return (
-      this.state.gameStatus === "mode_select" ||
-      this.state.gameStatus === "choosing" ||
-      this.state.gameStatus === "result"
-    );
+    return this.state.gameStatus === "choosing" || this.state.gameStatus === "result";
   }
 
   private finalizePlayerLeave(sessionId: string) {

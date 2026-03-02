@@ -619,6 +619,25 @@ describe("testing your Colyseus app", () => {
   });
 
   describe("Reconnection Grace Tests", () => {
+    it("does not allow reconnect grace during mode_select", async function () {
+      this.timeout(10000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const client1 = await colyseus.connectTo(room);
+      const client2 = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      const reconnectToken = client1.reconnectionToken;
+      await client1.leave(false);
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.size, 1);
+      assert.strictEqual(room.state.gameStatus, "finished");
+      assert.strictEqual(room.state.winner, client2.sessionId);
+      await assert.rejects(() => colyseus.sdk.reconnect<MyRoomState>(reconnectToken));
+    });
+
     it("resumes choosing phase when reconnecting within grace period", async function () {
       this.timeout(20000);
 

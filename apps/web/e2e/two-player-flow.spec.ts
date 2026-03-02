@@ -265,6 +265,22 @@ test("invalid roomId shows room error", async ({ browser }) => {
   }
 });
 
+test("joiner disconnect in room lobby is reflected immediately on host", async ({ browser }) => {
+  const session = await createAndJoinRoom(browser, "AliceLobbyDisc", "BobLobbyDisc");
+
+  try {
+    await session.pageB.evaluate(() => {
+      window.dispatchEvent(new Event("rps:force-disconnect"));
+    });
+
+    await expect(session.pageA.getByTestId("player-list").locator("li")).toHaveCount(1, {
+      timeout: WS_TIMEOUT_MS,
+    });
+  } finally {
+    await closePlayerSession(session);
+  }
+});
+
 test("reconnect resume with token restores active game session", async ({ browser }) => {
   const session = await createAndJoinRoom(browser, "AliceReconnect", "BobReconnect");
 
