@@ -2,8 +2,8 @@ services:
   rps-server:
     container_name: rps-server
     build:
-      context: ./apps/server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/server/Dockerfile
     environment:
       NODE_ENV: production
       PORT: 2567
