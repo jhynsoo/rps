@@ -13,10 +13,26 @@ import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
 type PlayerLike = PlayerStateView;
 type MyRoomStateLike = Pick<RoomStateView, "players" | "hostSessionId" | "gameStatus" | "gameMode">;
+type PlayersCollectionLike = {
+  size: number;
+  values: () => IterableIterator<PlayerLike>;
+};
 
 function getState(room: Room | null): MyRoomStateLike | null {
   if (!room) return null;
   return room.state as MyRoomStateLike;
+}
+
+function hasPlayersCollection(value: unknown): value is PlayersCollectionLike {
+  if (typeof value !== "object" || value === null) return false;
+  const maybe = value as { size?: unknown; values?: unknown };
+  return typeof maybe.size === "number" && typeof maybe.values === "function";
+}
+
+function getRenderableState(state: MyRoomStateLike | null): MyRoomStateLike | null {
+  if (!state) return null;
+  if (!hasPlayersCollection((state as { players?: unknown }).players)) return null;
+  return state;
 }
 
 type MessageDescriptor = {
@@ -56,7 +72,7 @@ export default function RoomLobbyPage() {
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   useRoomStateVersion(room);
 
-  const state = getState(room);
+  const state = getRenderableState(getState(room));
   const isMismatch = !!storeRoomId && storeRoomId !== roomId;
 
   const players = state ? Array.from(state.players.values()) : [];
@@ -85,7 +101,7 @@ export default function RoomLobbyPage() {
       setOpponentLeft(false);
     }
     if (size === 1 && hadTwoPlayersRef.current) setOpponentLeft(true);
-  }, [state?.players.size]);
+  }, [state?.players?.size]);
 
   useEffect(() => {
     if (gameStatus !== "choosing") return;
@@ -146,7 +162,23 @@ export default function RoomLobbyPage() {
     );
   }
 
-  if (!room || !state || isMismatch) {
+  if (room && !state && !isMismatch) {
+    return (
+      <main className="min-h-dvh bg-background text-foreground">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+              <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">{tRoom("waiting.reconnecting")}</h1>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!room || isMismatch) {
     const title = !room
       ? tRoom("waiting.errorNoActiveRoom")
       : isMismatch
@@ -184,6 +216,10 @@ export default function RoomLobbyPage() {
         </div>
       </main>
     );
+  }
+
+  if (!state) {
+    return null;
   }
 
   const gameStatusLabel = translateMessage(tGameMessage, gameStatusMessage(state.gameStatus));
