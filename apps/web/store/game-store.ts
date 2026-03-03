@@ -5,6 +5,7 @@ import { create } from "zustand";
 import {
   clearReconnectSnapshot,
   createReconnectSnapshot,
+  normalizeColyseusError,
   persistReconnectSnapshot,
   readReconnectSnapshot,
   readReconnectSnapshotStatus,
@@ -64,7 +65,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   reconnectState: "idle",
   reconnectError: null,
   setRoom: (room) => {
-    set({ room, roomId: room.roomId, leaveError: null, reconnectError: null, reconnectState: "idle" });
+    set({
+      room,
+      roomId: room.roomId,
+      leaveError: null,
+      reconnectError: null,
+      reconnectState: "idle",
+    });
     clearReconnectSnapshot();
 
     const initialSnapshot = createReconnectSnapshot(room);
@@ -177,12 +184,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return true;
     } catch (error) {
       clearReconnectSnapshot();
-
-      const message = error instanceof Error ? error.message : String(error);
+      const normalized = normalizeColyseusError(error, "reconnect");
       const reconnectError =
-        /invalid|token|format/i.test(message)
+        normalized.code === "RECONNECT_TOKEN_INVALID"
           ? "invalid"
-          : /expired|not found|no such/i.test(message)
+          : normalized.code === "RECONNECT_TOKEN_EXPIRED"
             ? "expired"
             : "network";
 

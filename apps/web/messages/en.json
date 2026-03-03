@@ -126,6 +126,14 @@
     "playerFallback": "Player",
     "ready": "Ready",
     "cancel": "Cancel",
+    "result": {
+      "title": "Result",
+      "roomLabel": "Room",
+      "opponentAgreement": {
+        "waiting": "Waiting for opponent rematch agreement.",
+        "accepted": "Opponent accepted rematch."
+      }
+    },
     "choices": {
       "rock": "Rock",
       "paper": "Paper",

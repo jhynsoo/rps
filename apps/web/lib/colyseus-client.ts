@@ -1,14 +1,33 @@
 "use client";
 
-import { Client, type Room } from "colyseus.js";
 import {
   RECONNECT_STORAGE_KEY,
   RECONNECT_TOKEN_TTL_MS,
   type ReconnectSnapshot,
 } from "@rps/contracts";
+import { Client, type Room } from "colyseus.js";
 
 type NicknameOptions = {
   nickname: string;
+};
+
+export type ColyseusBoundary = "create" | "join" | "reconnect";
+
+export type ColyseusBoundaryErrorCode =
+  | "CLIENT_ONLY"
+  | "SERVER_UNAVAILABLE"
+  | "ROOM_NOT_FOUND"
+  | "ROOM_FULL"
+  | "RECONNECT_TOKEN_INVALID"
+  | "RECONNECT_TOKEN_EXPIRED"
+  | "UNKNOWN";
+
+export type ColyseusBoundaryError = {
+  boundary: ColyseusBoundary;
+  code: ColyseusBoundaryErrorCode;
+  message: string;
+  rawMessage: string;
+  cause: unknown;
 };
 
 const DEFAULT_PORT = 2567;
@@ -47,18 +66,79 @@ function getClient() {
 }
 
 export async function createRoom({ nickname }: NicknameOptions): Promise<Room> {
-  const client = getClient();
-  return client.create("my_room", { nickname });
+  try {
+    const client = getClient();
+    return await client.create("my_room", { nickname });
+  } catch (error) {
+    throw normalizeColyseusError(error, "create");
+  }
 }
 
 export async function joinRoomById(roomId: string, { nickname }: NicknameOptions): Promise<Room> {
-  const client = getClient();
-  return client.joinById(roomId, { nickname });
+  try {
+    const client = getClient();
+    return await client.joinById(roomId, { nickname });
+  } catch (error) {
+    throw normalizeColyseusError(error, "join");
+  }
 }
 
 export async function reconnectRoom(token: string): Promise<Room> {
-  const client = getClient();
-  return client.reconnect(token);
+  try {
+    const client = getClient();
+    return await client.reconnect(token);
+  } catch (error) {
+    throw normalizeColyseusError(error, "reconnect");
+  }
+}
+
+export function normalizeColyseusError(
+  error: unknown,
+  boundary: ColyseusBoundary,
+): ColyseusBoundaryError {
+  if (isColyseusBoundaryError(error)) {
+    return error;
+  }
+
+  const rawMessage = error instanceof Error ? error.message : String(error ?? "");
+  const message = rawMessage.trim();
+
+  let code: ColyseusBoundaryErrorCode = "UNKNOWN";
+
+  if (/window is undefined|must be called on the client|client side/i.test(message)) {
+    code = "CLIENT_ONLY";
+  } else if (
+    /websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out|failed to fetch|connect failed/i.test(
+      message,
+    )
+  ) {
+    code = "SERVER_UNAVAILABLE";
+  } else if (boundary === "join") {
+    if (/full|maxClients|seat|locked/i.test(message)) code = "ROOM_FULL";
+    if (/not found|roomId|invalid|no such/i.test(message)) code = "ROOM_NOT_FOUND";
+  } else if (boundary === "reconnect") {
+    if (/invalid|format|malformed/i.test(message)) code = "RECONNECT_TOKEN_INVALID";
+    else if (/expired|not found|no such/i.test(message)) code = "RECONNECT_TOKEN_EXPIRED";
+  }
+
+  return {
+    boundary,
+    code,
+    message,
+    rawMessage,
+    cause: error,
+  };
+}
+
+export function isColyseusBoundaryError(error: unknown): error is ColyseusBoundaryError {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as Partial<ColyseusBoundaryError>;
+  return (
+    typeof candidate.boundary === "string" &&
+    typeof candidate.code === "string" &&
+    typeof candidate.message === "string" &&
+    typeof candidate.rawMessage === "string"
+  );
 }
 
 function isReconnectSnapshot(value: unknown): value is ReconnectSnapshot {

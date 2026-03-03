@@ -1,9 +1,9 @@
 export {
-  GAME_STATUSES,
-  GAME_MODES,
-  RPS_CHOICES,
   CLIENT_MESSAGE_TYPES,
-  type GameStatus,
+  GAME_MODES,
+  GAME_STATUSES,
   type GameMode,
+  type GameStatus,
+  RPS_CHOICES,
   type RpsChoice,
 } from "@rps/contracts";

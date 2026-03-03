@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { joinRoomById } from "@/lib/colyseus-client";
+import { joinRoomById, normalizeColyseusError } from "@/lib/colyseus-client";
 import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -58,22 +58,12 @@ export default function JoinRoomPage() {
     return null;
   }, [roomIdInput, touched, t]);
 
-  function formatJoinError(e: unknown) {
-    const raw = e instanceof Error ? e.message : String(e);
-    const msg = raw.trim();
-    if (!msg) return tGame("errors.joinFailed");
-
-    if (/full|maxClients|seat|locked/i.test(msg)) {
-      return tGame("errors.roomFull");
-    }
-    if (/not found|roomId|invalid|no such/i.test(msg)) {
-      return tGame("errors.roomNotFound");
-    }
-    if (/connect|websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out/i.test(msg)) {
-      return tGame("errors.serverUnavailable");
-    }
-
-    return msg;
+  function mapJoinErrorToKey(e: unknown) {
+    const normalized = normalizeColyseusError(e, "join");
+    if (normalized.code === "ROOM_FULL") return "errors.roomFull";
+    if (normalized.code === "ROOM_NOT_FOUND") return "errors.roomNotFound";
+    if (normalized.code === "SERVER_UNAVAILABLE") return "errors.serverUnavailable";
+    return "errors.joinFailed";
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -110,7 +100,7 @@ export default function JoinRoomPage() {
       transferredRef.current = true;
       router.replace(`/room/${joined.roomId}`);
     } catch (err) {
-      if (mountedRef.current) setError(formatJoinError(err));
+      if (mountedRef.current) setError(tGame(mapJoinErrorToKey(err) as never));
     } finally {
       if (mountedRef.current) setJoining(false);
     }
@@ -134,7 +124,7 @@ export default function JoinRoomPage() {
               <button
                 type="button"
                 onClick={() => {
-                  void leaveRoom().finally(() => router.push("/lobby"));
+                  void leaveRoom().finally(() => router.push("/menu"));
                 }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
@@ -172,9 +162,7 @@ export default function JoinRoomPage() {
                 type="submit"
                 data-testid="join-submit"
                 disabled={
-                  joining ||
-                  !nickname ||
-                  isActionBlockedByLeaveError("join-submit", leaveError)
+                  joining || !nickname || isActionBlockedByLeaveError("join-submit", leaveError)
                 }
                 className="inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >

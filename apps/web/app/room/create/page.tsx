@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { createRoom } from "@/lib/colyseus-client";
+import { createRoom, normalizeColyseusError } from "@/lib/colyseus-client";
 import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
@@ -77,7 +77,7 @@ export default function CreateRoomPage() {
         router.replace(`/room/${created.roomId}`);
       } catch (e) {
         if (!active) return;
-        setError(e instanceof Error ? e.message : t("create.failed"));
+        setError(tGame(mapCreateErrorToKey(e) as never));
       }
     }
 
@@ -90,7 +90,7 @@ export default function CreateRoomPage() {
 
       if (current && !transferredRef.current) void leaveRoom();
     };
-  }, [nickname, leaveRoom, router, setRoom, t]);
+  }, [nickname, leaveRoom, router, setRoom, tGame]);
 
   const roomId = room?.roomId ?? "";
   const statusLine = useMemo(() => {
@@ -130,7 +130,7 @@ export default function CreateRoomPage() {
               <button
                 type="button"
                 onClick={() => {
-                  void leaveRoom().finally(() => router.push("/lobby"));
+                  void leaveRoom().finally(() => router.push("/menu"));
                 }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
@@ -195,4 +195,9 @@ export default function CreateRoomPage() {
       </div>
     </main>
   );
+}
+function mapCreateErrorToKey(error: unknown) {
+  const normalized = normalizeColyseusError(error, "create");
+  if (normalized.code === "SERVER_UNAVAILABLE") return "errors.serverUnavailable";
+  return "errors.createFailed";
 }

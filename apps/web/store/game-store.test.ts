@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearReconnectSnapshot,
   createReconnectSnapshot,
+  normalizeColyseusError,
   persistReconnectSnapshot,
   readReconnectSnapshot,
   readReconnectSnapshotStatus,
@@ -11,14 +12,24 @@ import {
 } from "@/lib/colyseus-client";
 import {
   isActionBlockedByLeaveError,
+  type LeaveErrorAction,
   leaveErrorDisconnected,
   useGameStore,
-  type LeaveErrorAction,
 } from "@/store/game-store";
 
 vi.mock("@/lib/colyseus-client", () => ({
   clearReconnectSnapshot: vi.fn(),
   createReconnectSnapshot: vi.fn(),
+  normalizeColyseusError: vi.fn((error: unknown) => ({
+    boundary: "reconnect",
+    code:
+      error instanceof Error && /invalid/i.test(error.message)
+        ? "RECONNECT_TOKEN_INVALID"
+        : "UNKNOWN",
+    message: error instanceof Error ? error.message : String(error ?? ""),
+    rawMessage: error instanceof Error ? error.message : String(error ?? ""),
+    cause: error,
+  })),
   persistReconnectSnapshot: vi.fn(),
   readReconnectSnapshot: vi.fn(),
   readReconnectSnapshotStatus: vi.fn(),
@@ -150,6 +161,13 @@ describe("useGameStore", () => {
       expiresAt: Date.now() + 600000,
     });
     vi.mocked(reconnectRoom).mockRejectedValue(new Error("Invalid reconnection token format"));
+    vi.mocked(normalizeColyseusError).mockReturnValue({
+      boundary: "reconnect",
+      code: "RECONNECT_TOKEN_INVALID",
+      message: "Invalid reconnection token format",
+      rawMessage: "Invalid reconnection token format",
+      cause: new Error("Invalid reconnection token format"),
+    });
 
     const result = await useGameStore.getState().attemptReconnect("room-invalid");
 
@@ -167,6 +185,13 @@ describe("useGameStore", () => {
       expiresAt: Date.now() + 600000,
     });
     vi.mocked(reconnectRoom).mockRejectedValue(new Error("ECONNREFUSED"));
+    vi.mocked(normalizeColyseusError).mockReturnValue({
+      boundary: "reconnect",
+      code: "SERVER_UNAVAILABLE",
+      message: "ECONNREFUSED",
+      rawMessage: "ECONNREFUSED",
+      cause: new Error("ECONNREFUSED"),
+    });
 
     const result = await useGameStore.getState().attemptReconnect("room-network");
 
