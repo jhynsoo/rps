@@ -35,7 +35,7 @@ export default function Home() {
     }
 
     window.localStorage.setItem(NICKNAME_STORAGE_KEY, cleaned);
-    router.push("/lobby");
+    router.push("/menu");
   }
 
   return (

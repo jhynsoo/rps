@@ -1,7 +1,7 @@
 "use client";
 
-import type { Room } from "colyseus.js";
 import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
+import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
@@ -110,6 +110,12 @@ export default function RoomLobbyPage() {
   }, [gameStatus, roomId, router]);
 
   useEffect(() => {
+    if (gameStatus !== "result" && gameStatus !== "finished") return;
+    if (!roomId) return;
+    router.replace(`/result/${roomId}`);
+  }, [gameStatus, roomId, router]);
+
+  useEffect(() => {
     if (room) return;
     if (!roomId) return;
     if (storeRoomId && storeRoomId !== roomId) return;
@@ -129,7 +135,7 @@ export default function RoomLobbyPage() {
     try {
       await leaveRoom();
     } finally {
-      router.push("/lobby");
+      router.push("/menu");
     }
   }
 
@@ -154,7 +160,9 @@ export default function RoomLobbyPage() {
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
               <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">{tRoom("waiting.reconnecting")}</h1>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">
+                {tRoom("waiting.reconnecting")}
+              </h1>
             </div>
           </div>
         </div>
@@ -170,7 +178,9 @@ export default function RoomLobbyPage() {
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
               <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">{tRoom("waiting.reconnecting")}</h1>
+              <h1 className="mt-1 font-mono text-2xl tracking-tight">
+                {tRoom("waiting.reconnecting")}
+              </h1>
             </div>
           </div>
         </div>
@@ -209,7 +219,7 @@ export default function RoomLobbyPage() {
                 className="mt-6 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>{tRoom("status.backToLobby")}</span>
-                <span className="font-mono text-xs opacity-70">/lobby</span>
+                <span className="font-mono text-xs opacity-70">/menu</span>
               </button>
             </div>
           </div>

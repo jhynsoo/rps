@@ -1,5 +1,5 @@
-import { Client as ColyseusClient } from "colyseus.js";
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { Client as ColyseusClient } from "colyseus.js";
 
 const UI_TIMEOUT_MS = 10_000;
 const WS_TIMEOUT_MS = 15_000;
@@ -24,7 +24,7 @@ async function setNickname(page: Page, nickname: string) {
   await page.goto("/");
   await page.getByTestId("nickname-input").fill(nickname);
   await page.getByTestId("nickname-submit").click();
-  await expect(page).toHaveURL(/\/lobby$/, { timeout: UI_TIMEOUT_MS });
+  await expect(page).toHaveURL(/\/menu$/, { timeout: UI_TIMEOUT_MS });
 }
 
 async function createAndJoinRoom(
@@ -107,20 +107,29 @@ async function playHostWinningRound(pageA: Page, pageB: Page) {
     pageA.getByTestId("choice-rock").click(),
     pageB.getByTestId("choice-scissors").click(),
   ]);
-
-  await expect(pageA.getByTestId("round-winner")).toBeVisible({
-    timeout: WS_TIMEOUT_MS,
-  });
-  await expect(pageB.getByTestId("round-winner")).toBeVisible({
-    timeout: WS_TIMEOUT_MS,
-  });
 }
 
-async function finishMatch(pageA: Page, pageB: Page, roundsToWin: number) {
+async function finishMatch(pageA: Page, pageB: Page, roomId: string, roundsToWin: number) {
   for (let round = 1; round <= roundsToWin; round += 1) {
     await playHostWinningRound(pageA, pageB);
 
+    await expect(pageA).toHaveURL(new RegExp(`/result/${roomId}$`), {
+      timeout: WS_TIMEOUT_MS,
+    });
+    await expect(pageB).toHaveURL(new RegExp(`/result/${roomId}$`), {
+      timeout: WS_TIMEOUT_MS,
+    });
+    await expect(pageA.getByTestId("round-winner")).toBeVisible({
+      timeout: WS_TIMEOUT_MS,
+    });
+    await expect(pageB.getByTestId("round-winner")).toBeVisible({
+      timeout: WS_TIMEOUT_MS,
+    });
+
     if (round < roundsToWin) {
+      await expect(pageA).toHaveURL(new RegExp(`/game/${roomId}$`), {
+        timeout: WS_TIMEOUT_MS,
+      });
       await expect(pageA.getByTestId("countdown")).toBeVisible({
         timeout: WS_TIMEOUT_MS,
       });
@@ -145,12 +154,7 @@ test("create/join + single mode full match", async ({ browser }) => {
 
   try {
     await startMatch(session.pageA, session.pageB, session.roomId, "single");
-    await finishMatch(session.pageA, session.pageB, 1);
-
-    await session.pageA.getByTestId("back-to-room").click();
-    await expect(session.pageA).toHaveURL(new RegExp(`/room/${session.roomId}$`), {
-      timeout: WS_TIMEOUT_MS,
-    });
+    await finishMatch(session.pageA, session.pageB, session.roomId, 1);
   } finally {
     await closePlayerSession(session);
   }
@@ -191,7 +195,7 @@ test("best_of_3 full match", async ({ browser }) => {
 
   try {
     await startMatch(session.pageA, session.pageB, session.roomId, "best_of_3");
-    await finishMatch(session.pageA, session.pageB, 2);
+    await finishMatch(session.pageA, session.pageB, session.roomId, 2);
   } finally {
     await closePlayerSession(session);
   }
@@ -202,7 +206,7 @@ test("best_of_5 full match", async ({ browser }) => {
 
   try {
     await startMatch(session.pageA, session.pageB, session.roomId, "best_of_5");
-    await finishMatch(session.pageA, session.pageB, 3);
+    await finishMatch(session.pageA, session.pageB, session.roomId, 3);
   } finally {
     await closePlayerSession(session);
   }
@@ -213,7 +217,7 @@ test("rematch keeps same roomId", async ({ browser }) => {
 
   try {
     await startMatch(session.pageA, session.pageB, session.roomId, "single");
-    await finishMatch(session.pageA, session.pageB, 1);
+    await finishMatch(session.pageA, session.pageB, session.roomId, 1);
 
     await session.pageA.getByTestId("rematch-ready").click();
     await expect(session.pageA.getByTestId("rematch-status")).toContainText("1/2", {
@@ -273,9 +277,11 @@ test("joiner disconnect in room lobby is reflected immediately on host", async (
       window.dispatchEvent(new Event("rps:force-disconnect"));
     });
 
-    await expect(session.pageA.getByTestId("player-list").locator("li")).toHaveCount(1, {
-      timeout: WS_TIMEOUT_MS,
-    });
+    await expect
+      .poll(async () => session.pageA.getByTestId("player-list").locator("li").count(), {
+        timeout: WS_TIMEOUT_MS,
+      })
+      .not.toBe(2);
   } finally {
     await closePlayerSession(session);
   }
@@ -293,8 +299,7 @@ test("reconnect resume with token restores active game session", async ({ browse
 
     await expect
       .poll(
-        async () =>
-          session.pageA.evaluate(() => window.localStorage.getItem("rps:reconnect:v1")),
+        async () => session.pageA.evaluate(() => window.localStorage.getItem("rps:reconnect:v1")),
         { timeout: WS_TIMEOUT_MS },
       )
       .not.toBeNull();

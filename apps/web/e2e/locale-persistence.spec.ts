@@ -25,7 +25,7 @@ test("language toggle persists after reload", async ({ page }) => {
   await expect(page.getByTestId("home-nickname-prompt")).toHaveText(EN_HOME_PROMPT);
 });
 
-test("language toggle persists on /lobby navigation", async ({ page }) => {
+test("language toggle persists on /menu navigation", async ({ page }) => {
   const nickname = "PersistNav";
 
   await page.goto("/");
@@ -36,7 +36,7 @@ test("language toggle persists on /lobby navigation", async ({ page }) => {
   await page.getByTestId("nickname-input").fill(nickname);
   await page.getByTestId("nickname-submit").click();
 
-  await expect(page).toHaveURL(/\/lobby$/, { timeout: UI_TIMEOUT_MS });
+  await expect(page).toHaveURL(/\/menu$/, { timeout: UI_TIMEOUT_MS });
   await expect(page.locator("html")).toHaveAttribute("lang", "en", {
     timeout: UI_TIMEOUT_MS,
   });

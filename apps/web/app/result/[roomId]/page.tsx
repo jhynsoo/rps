@@ -4,16 +4,15 @@ import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "
 import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
-import type { RpsChoice } from "@/lib/rps";
-import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
+import { useEffect, useRef } from "react";
+import { gameModeMessage, gameStatusMessage } from "@/lib/rps-i18n";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
 type PlayerLike = PlayerStateView;
 type MyRoomStateLike = Pick<
   RoomStateView,
-  "players" | "gameStatus" | "gameMode" | "countdown" | "winner" | "roundNumber"
+  "players" | "gameStatus" | "gameMode" | "winner" | "roundNumber"
 >;
 type PlayersCollectionLike = {
   size: number;
@@ -49,7 +48,14 @@ function translateMessage(
   return message.values ? t(message.key, message.values) : t(message.key);
 }
 
-export default function GamePage() {
+function getWinnerLabel(winner: string, players: PlayerLike[], drawLabel: string) {
+  if (!winner) return "";
+  if (winner === "draw") return drawLabel;
+  const p = players.find((x) => x.sessionId === winner);
+  return p?.nickname || winner.slice(0, 6);
+}
+
+export default function ResultPage() {
   const tGame = useTranslations("game");
   const t = (key: string, values?: Record<string, string | number>) =>
     values ? tGame(key as never, values as never) : tGame(key as never);
@@ -72,17 +78,13 @@ export default function GamePage() {
 
   const players = state ? Array.from(state.players.values()) : [];
   const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
+  const opponent = room ? (players.find((p) => p.sessionId !== room.sessionId) ?? null) : null;
 
   const gameStatus = state?.gameStatus ?? "";
-  const selfChoice = self?.choice ?? "";
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
 
-  const [choiceSent, setChoiceSent] = useState<RpsChoice | null>(null);
   const reconnectAttemptedRef = useRef(false);
-
-  const hadTwoPlayersRef = useRef(false);
-  const [opponentLeft, setOpponentLeft] = useState(false);
 
   useEffect(() => {
     if (gameStatus !== "waiting" && gameStatus !== "mode_select") return;
@@ -91,9 +93,9 @@ export default function GamePage() {
   }, [gameStatus, roomId, router]);
 
   useEffect(() => {
-    if (gameStatus !== "result" && gameStatus !== "finished") return;
+    if (gameStatus !== "choosing") return;
     if (!roomId) return;
-    router.replace(`/result/${roomId}`);
+    router.replace(`/game/${roomId}`);
   }, [gameStatus, roomId, router]);
 
   useEffect(() => {
@@ -112,31 +114,12 @@ export default function GamePage() {
     };
   }, [attemptReconnect, room, roomId, storeRoomId]);
 
-  useEffect(() => {
-    if (gameStatus !== "choosing") return;
-    if (selfChoice !== "") return;
-    setChoiceSent(null);
-  }, [gameStatus, selfChoice]);
-
-  useEffect(() => {
-    const size = state?.players.size ?? 0;
-    if (size === 2) {
-      hadTwoPlayersRef.current = true;
-      setOpponentLeft(false);
-    }
-    if (size === 1 && hadTwoPlayersRef.current) setOpponentLeft(true);
-  }, [state?.players?.size]);
-
-  async function onBackToLobby() {
+  async function onBackToMenu() {
     try {
       await leaveRoom();
     } finally {
       router.push("/menu");
     }
-  }
-
-  function choiceLabel(choice: string) {
-    return translateMessage(t, rpsChoiceMessage(choice));
   }
 
   if (!room && reconnectState === "trying" && !isMismatch) {
@@ -197,7 +180,7 @@ export default function GamePage() {
               <button
                 type="button"
                 onClick={() => {
-                  void onBackToLobby();
+                  void onBackToMenu();
                 }}
                 className="mt-6 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -215,22 +198,12 @@ export default function GamePage() {
     return null;
   }
 
-  const isMultiRound = state.gameMode === "best_of_3" || state.gameMode === "best_of_5";
-
-  const activeRoom = room;
-
-  const canChoose =
-    !isActionBlockedByLeaveError("choice-rock", leaveError) &&
-    gameStatus === "choosing" &&
-    !!self &&
-    selfChoice === "" &&
-    choiceSent === null;
-
-  function sendChoice(choice: RpsChoice) {
-    if (!canChoose) return;
-    setChoiceSent(choice);
-    activeRoom.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice });
-  }
+  const selfReady = self?.isReady ?? false;
+  const opponentReady = opponent?.isReady ?? false;
+  const readyCount = players.filter((p) => p.isReady).length;
+  const totalPlayers = state.players.size;
+  const winnerLabel = getWinnerLabel(state.winner, players, t("errors.draw"));
+  const isFinished = gameStatus === "finished";
 
   return (
     <main className="min-h-dvh bg-background text-foreground">
@@ -242,9 +215,7 @@ export default function GamePage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs text-muted-foreground">{t("title")}</p>
-                <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                  {t("roundLabel")} {state.roundNumber}
-                </h1>
+                <h1 className="mt-1 font-mono text-2xl tracking-tight">{t("result.title")}</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {t("statusLabel")}: <span className="text-foreground">{gameStatusLabel}</span>
                 </p>
@@ -254,91 +225,75 @@ export default function GamePage() {
               </div>
               <button
                 type="button"
-                data-testid="back-to-room"
-                onClick={() => router.push(`/room/${roomId}`)}
+                onClick={() => {
+                  void onBackToMenu();
+                }}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
-                {t("backToRoom")}
+                {t("backToLobby")}
               </button>
             </div>
 
             {leaveError ? (
-              <p className="mt-4 text-sm text-destructive">{tGame(leaveError as never)}</p>
+              <p className="mt-4 text-sm text-destructive">{t(leaveError as never)}</p>
             ) : null}
 
-            {!leaveError && opponentLeft ? (
+            <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs font-medium text-muted-foreground">{t("result.roomLabel")}</p>
+              <p className="mt-1 font-mono text-lg">{roomId || "-"}</p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t("roundLabel")} {state.roundNumber}
+              </p>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
+              <p className="text-xs font-medium text-muted-foreground">{t("roundResult")}</p>
+              <p data-testid="round-winner" className="mt-2 font-mono text-lg">
+                {winnerLabel ? t("state.winner", { winner: winnerLabel }) : ""}
+              </p>
+            </div>
+
+            {isFinished ? (
               <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
-                <p className="font-mono text-xs text-muted-foreground">{t("statusLabel")}</p>
-                <p className="mt-1 text-sm text-foreground">{t("opponentLeft")}</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("matchResult")}</p>
+                <p data-testid="match-winner" className="mt-2 font-mono text-lg">
+                  {winnerLabel ? t("state.winner", { winner: winnerLabel }) : ""}
+                </p>
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-3">
-              <div className="rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">{t("countdownLabel")}</p>
-                <p data-testid="countdown" className="mt-1 font-mono text-3xl tracking-tight">
-                  {state.countdown}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-background/60 p-4">
-                <p className="text-xs font-medium text-muted-foreground">{t("yourChoiceLabel")}</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    data-testid="choice-rock"
-                    disabled={!canChoose}
-                    onClick={() => sendChoice("rock")}
-                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {choiceLabel("rock")}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="choice-paper"
-                    disabled={!canChoose}
-                    onClick={() => sendChoice("paper")}
-                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {choiceLabel("paper")}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="choice-scissors"
-                    disabled={!canChoose}
-                    onClick={() => sendChoice("scissors")}
-                    className="h-12 rounded-xl border border-border bg-card px-2 text-sm font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {choiceLabel("scissors")}
-                  </button>
+            <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{t("rematchLabel")}</p>
+                  <p data-testid="rematch-status" className="mt-1 text-sm text-muted-foreground">
+                    {t("state.readyCount", { ready: readyCount, total: totalPlayers })}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {opponentReady
+                      ? t("result.opponentAgreement.accepted")
+                      : t("result.opponentAgreement.waiting")}
+                  </p>
                 </div>
-
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {selfChoice
-                    ? t("state.locked", { choice: choiceLabel(selfChoice) })
-                    : choiceSent
-                      ? t("state.sending", { choice: choiceLabel(choiceSent) })
-                      : gameStatus === "choosing"
-                        ? t("state.pickOne")
-                        : t("state.waitNextRound")}
-                </p>
+                <button
+                  type="button"
+                  data-testid="rematch-ready"
+                  disabled={
+                    isActionBlockedByLeaveError("rematch-ready", leaveError) || !isFinished || !self
+                  }
+                  onClick={() => {
+                    if (!isFinished || !self) return;
+                    room.send(
+                      selfReady
+                        ? CLIENT_MESSAGE_TYPES.REMATCH_CANCEL
+                        : CLIENT_MESSAGE_TYPES.REMATCH_READY,
+                    );
+                  }}
+                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-xs font-medium shadow-sm transition enabled:hover:brightness-110 disabled:opacity-50"
+                >
+                  {selfReady ? t("cancel") : t("ready")}
+                </button>
               </div>
-
-              {isMultiRound ? (
-                <div className="rounded-2xl border border-border bg-background/60 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">{t("scoreLabel")}</p>
-                  <div className="mt-3 grid gap-2">
-                    {players.map((p) => (
-                      <div key={p.sessionId} className="flex items-center justify-between gap-3">
-                        <span className="min-w-0 truncate font-mono text-sm">
-                          {p.nickname || t("playerFallback")}
-                        </span>
-                        <span className="font-mono text-sm">{p.score}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
