@@ -58,10 +58,8 @@ describe("testing your Colyseus app", () => {
 
       assert.strictEqual(client1.sessionId, room.clients[0].sessionId);
       await room.waitForNextPatch();
-
-      const state = client1.state.toJSON() as Record<string, unknown>;
-      assert.strictEqual(state.gameStatus, "waiting");
-      assert.ok(state.players !== undefined);
+      assert.strictEqual(room.state.gameStatus, "waiting");
+      assert.ok(room.state.players !== undefined);
     });
   });
 
