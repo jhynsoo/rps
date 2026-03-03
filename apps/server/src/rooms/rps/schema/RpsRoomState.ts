@@ -1,0 +1,20 @@
+import { MapSchema, Schema, type } from "@colyseus/schema";
+import { GAME_STATUSES } from "@rps/contracts";
+
+export class PlayerState extends Schema {
+  @type("string") sessionId: string = "";
+  @type("string") nickname: string = "Player";
+  @type("string") choice: string = "";
+  @type("number") score: number = 0;
+  @type("boolean") isReady: boolean = false;
+}
+
+export class RpsRoomState extends Schema {
+  @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
+  @type("string") hostSessionId: string = "";
+  @type("string") gameStatus: string = GAME_STATUSES[0];
+  @type("string") gameMode: string = "";
+  @type("number") countdown: number = 0;
+  @type("string") winner: string = "";
+  @type("number") roundNumber: number = 1;
+}

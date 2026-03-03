@@ -25,6 +25,56 @@ export declare const CLIENT_MESSAGE_TYPES: {
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[keyof typeof CLIENT_MESSAGE_TYPES];
 
+export declare const JOIN_ERROR_CODES: {
+  readonly ROOM_FULL: "join.room_full";
+  readonly DUPLICATE_SESSION: "join.duplicate_session";
+  readonly INVALID_NICKNAME: "join.invalid_nickname";
+};
+
+export type JoinErrorCode = (typeof JOIN_ERROR_CODES)[keyof typeof JOIN_ERROR_CODES];
+
+export declare const ACTION_ERROR_CODES: {
+  readonly INVALID_STATE: "action.invalid_state";
+  readonly NOT_HOST: "action.not_host";
+  readonly INVALID_PAYLOAD: "action.invalid_payload";
+  readonly INVALID_MODE: "action.invalid_mode";
+  readonly INVALID_CHOICE: "action.invalid_choice";
+  readonly ALREADY_CHOSEN: "action.already_chosen";
+};
+
+export type ActionErrorCode = (typeof ACTION_ERROR_CODES)[keyof typeof ACTION_ERROR_CODES];
+
+export declare const TRANSPORT_ERROR_CODES: {
+  readonly CONNECTION_LOST: "transport.connection_lost";
+  readonly RECONNECT_EXPIRED: "transport.reconnect_expired";
+  readonly RECONNECT_REJECTED: "transport.reconnect_rejected";
+};
+
+export type TransportErrorCode = (typeof TRANSPORT_ERROR_CODES)[keyof typeof TRANSPORT_ERROR_CODES];
+
+export type NormalizedErrorCode = JoinErrorCode | ActionErrorCode | TransportErrorCode;
+
+export declare const NORMALIZED_ERROR_CODES: {
+  readonly ROOM_FULL: "join.room_full";
+  readonly DUPLICATE_SESSION: "join.duplicate_session";
+  readonly INVALID_NICKNAME: "join.invalid_nickname";
+  readonly INVALID_STATE: "action.invalid_state";
+  readonly NOT_HOST: "action.not_host";
+  readonly INVALID_PAYLOAD: "action.invalid_payload";
+  readonly INVALID_MODE: "action.invalid_mode";
+  readonly INVALID_CHOICE: "action.invalid_choice";
+  readonly ALREADY_CHOSEN: "action.already_chosen";
+  readonly CONNECTION_LOST: "transport.connection_lost";
+  readonly RECONNECT_EXPIRED: "transport.reconnect_expired";
+  readonly RECONNECT_REJECTED: "transport.reconnect_rejected";
+};
+
+export type TransportError = {
+  code: TransportErrorCode;
+  message: string;
+  retryable: boolean;
+};
+
 export declare const RECONNECT_GRACE_SECONDS: 10;
 export declare const RECONNECT_TOKEN_TTL_MS: 600000;
 export declare const RECONNECT_STORAGE_KEY: "rps:reconnect:v1";
