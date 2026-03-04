@@ -1,6 +1,10 @@
 import assert from "node:assert";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
-import { CLIENT_MESSAGE_TYPES, RECONNECT_GRACE_SECONDS } from "@rps/contracts";
+import {
+  CLIENT_MESSAGE_TYPES,
+  RECONNECT_GRACE_SECONDS,
+  RECONNECT_TOKEN_TTL_MS,
+} from "@rps/contracts";
 
 import appConfig from "../src/app.config";
 import { MyRoomState, Player } from "../src/rooms/schema/MyRoomState";
@@ -48,6 +52,10 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(state.players.get("test-session")?.sessionId, "test-session");
       assert.strictEqual(state.players.get("test-session")?.choice, "rock");
       assert.strictEqual(state.players.get("test-session")?.score, 1);
+    });
+
+    it("RECONNECT_TOKEN_TTL_MS is derived from RECONNECT_GRACE_SECONDS", () => {
+      assert.strictEqual(RECONNECT_TOKEN_TTL_MS, RECONNECT_GRACE_SECONDS * 1000);
     });
   });
 

@@ -1,4 +1,11 @@
-import { CLIENT_MESSAGE_TYPES, RECONNECT_GRACE_SECONDS } from "@rps/contracts";
+import {
+  ACTION_ERROR_CODES,
+  CLIENT_MESSAGE_TYPES,
+  RECONNECT_GRACE_SECONDS,
+  SERVER_MESSAGE_TYPES,
+  type ActionErrorCode,
+  type ErrorEnvelope,
+} from "@rps/contracts";
 import { type Client, type Delayed, Room } from "colyseus";
 
 import {
@@ -33,27 +40,75 @@ export class RpsRoom extends Room<RpsRoomState> {
   private countdownInterval: Delayed | null = null;
   private resultTimeout: Delayed | null = null;
 
+  private sendActionError(client: Client, code: ActionErrorCode, message: string): void {
+    const error: ErrorEnvelope = {
+      boundary: "action",
+      code,
+      message,
+    };
+
+    client.send(SERVER_MESSAGE_TYPES.ERROR, error);
+  }
+
   onCreate(_options: unknown): void {
     this.setState(new RpsRoomState());
 
     this.onMessage(CLIENT_MESSAGE_TYPES.SELECT_MODE, (client, message: unknown) => {
-      if (this.state.gameStatus !== LOBBY_GAME_STATUS) return;
-      if (this.clients.length !== this.maxClients) return;
-      if (client.sessionId !== this.state.hostSessionId) return;
-      if (!isSelectModeMessage(message)) return;
-      if (!isValidMode(message.mode)) return;
+      if (this.state.gameStatus !== LOBBY_GAME_STATUS) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_STATE, "Game mode can only be selected in the lobby.");
+        return;
+      }
+
+      if (this.clients.length !== this.maxClients) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_STATE, "Game mode selection requires two connected players.");
+        return;
+      }
+
+      if (client.sessionId !== this.state.hostSessionId) {
+        this.sendActionError(client, ACTION_ERROR_CODES.NOT_HOST, "Only the host can select the game mode.");
+        return;
+      }
+
+      if (!isSelectModeMessage(message)) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_PAYLOAD, "Invalid payload for select_mode.");
+        return;
+      }
+
+      if (!isValidMode(message.mode)) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_MODE, "Invalid game mode.");
+        return;
+      }
 
       this.state.gameMode = message.mode;
       this.startChoosingPhase();
     });
 
     this.onMessage(CLIENT_MESSAGE_TYPES.CHOICE, (client, message: unknown) => {
-      if (this.state.gameStatus !== "choosing") return;
-      if (!isChoiceMessage(message)) return;
-      if (!isValidChoice(message.choice)) return;
+      if (this.state.gameStatus !== "choosing") {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_STATE, "Choices are only accepted during the choosing phase.");
+        return;
+      }
+
+      if (!isChoiceMessage(message)) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_PAYLOAD, "Invalid payload for choice.");
+        return;
+      }
+
+      if (!isValidChoice(message.choice)) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_CHOICE, "Invalid choice.");
+        return;
+      }
 
       const player = this.state.players.get(client.sessionId);
-      if (!player || player.choice !== "") return;
+      if (!player) {
+        this.sendActionError(client, ACTION_ERROR_CODES.INVALID_STATE, "Player is not part of this room.");
+        return;
+      }
+
+      if (player.choice !== "") {
+        this.sendActionError(client, ACTION_ERROR_CODES.ALREADY_CHOSEN, "Choice already submitted for this round.");
+        return;
+      }
 
       player.choice = message.choice;
       this.checkBothPlayersChosen();

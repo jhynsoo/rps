@@ -11,6 +11,10 @@ export const CLIENT_MESSAGE_TYPES = {
   REMATCH_CANCEL: "rematch_cancel",
 };
 
+export const SERVER_MESSAGE_TYPES = {
+  ERROR: "error",
+};
+
 export const JOIN_ERROR_CODES = {
   ROOM_FULL: "join.room_full",
   DUPLICATE_SESSION: "join.duplicate_session",
@@ -39,5 +43,5 @@ export const NORMALIZED_ERROR_CODES = {
 };
 
 export const RECONNECT_GRACE_SECONDS = 10;
-export const RECONNECT_TOKEN_TTL_MS = 600000;
+export const RECONNECT_TOKEN_TTL_MS = RECONNECT_GRACE_SECONDS * 1000;
 export const RECONNECT_STORAGE_KEY = "rps:reconnect:v1";

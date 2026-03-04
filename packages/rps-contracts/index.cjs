@@ -11,6 +11,10 @@ const CLIENT_MESSAGE_TYPES = {
   REMATCH_CANCEL: "rematch_cancel",
 };
 
+const SERVER_MESSAGE_TYPES = {
+  ERROR: "error",
+};
+
 const JOIN_ERROR_CODES = {
   ROOM_FULL: "join.room_full",
   DUPLICATE_SESSION: "join.duplicate_session",
@@ -39,7 +43,7 @@ const NORMALIZED_ERROR_CODES = {
 };
 
 const RECONNECT_GRACE_SECONDS = 10;
-const RECONNECT_TOKEN_TTL_MS = 600000;
+const RECONNECT_TOKEN_TTL_MS = RECONNECT_GRACE_SECONDS * 1000;
 const RECONNECT_STORAGE_KEY = "rps:reconnect:v1";
 
 module.exports = {
@@ -47,6 +51,7 @@ module.exports = {
   GAME_MODES,
   RPS_CHOICES,
   CLIENT_MESSAGE_TYPES,
+  SERVER_MESSAGE_TYPES,
   JOIN_ERROR_CODES,
   ACTION_ERROR_CODES,
   TRANSPORT_ERROR_CODES,

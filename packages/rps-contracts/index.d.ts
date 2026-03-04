@@ -25,6 +25,12 @@ export declare const CLIENT_MESSAGE_TYPES: {
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[keyof typeof CLIENT_MESSAGE_TYPES];
 
+export declare const SERVER_MESSAGE_TYPES: {
+  readonly ERROR: "error";
+};
+
+export type ServerMessageType = (typeof SERVER_MESSAGE_TYPES)[keyof typeof SERVER_MESSAGE_TYPES];
+
 export declare const JOIN_ERROR_CODES: {
   readonly ROOM_FULL: "join.room_full";
   readonly DUPLICATE_SESSION: "join.duplicate_session";
@@ -52,7 +58,11 @@ export declare const TRANSPORT_ERROR_CODES: {
 
 export type TransportErrorCode = (typeof TRANSPORT_ERROR_CODES)[keyof typeof TRANSPORT_ERROR_CODES];
 
-export type NormalizedErrorCode = JoinErrorCode | ActionErrorCode | TransportErrorCode;
+export type ErrorCode = JoinErrorCode | ActionErrorCode | TransportErrorCode;
+
+export type ErrorBoundary = "join" | "action" | "transport";
+
+export type NormalizedErrorCode = ErrorCode;
 
 export declare const NORMALIZED_ERROR_CODES: {
   readonly ROOM_FULL: "join.room_full";
@@ -69,6 +79,14 @@ export declare const NORMALIZED_ERROR_CODES: {
   readonly RECONNECT_REJECTED: "transport.reconnect_rejected";
 };
 
+export type ErrorEnvelope = {
+  boundary: ErrorBoundary;
+  code: ErrorCode;
+  message: string;
+  retryable?: boolean;
+  details?: Record<string, unknown>;
+};
+
 export type TransportError = {
   code: TransportErrorCode;
   message: string;
@@ -76,7 +94,7 @@ export type TransportError = {
 };
 
 export declare const RECONNECT_GRACE_SECONDS: 10;
-export declare const RECONNECT_TOKEN_TTL_MS: 600000;
+export declare const RECONNECT_TOKEN_TTL_MS: number;
 export declare const RECONNECT_STORAGE_KEY: "rps:reconnect:v1";
 
 export type ReconnectSnapshot = {
