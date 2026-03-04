@@ -1,12 +1,15 @@
 "use client";
 
 import type { Room } from "colyseus.js";
+import { TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createRoom, normalizeColyseusError } from "@/lib/colyseus-client";
+import { LEGACY_ERROR_CODES } from "@/lib/error-contract";
 import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { safeLeave } from "@/lib/safe-leave";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
 
@@ -65,7 +68,7 @@ export default function CreateRoomPage() {
       try {
         const created = await createRoom({ nickname: nick });
         if (!active) {
-          void created.leave();
+          void safeLeave(created);
           return;
         }
 
@@ -198,6 +201,11 @@ export default function CreateRoomPage() {
 }
 function mapCreateErrorToKey(error: unknown) {
   const normalized = normalizeColyseusError(error, "create");
-  if (normalized.code === "SERVER_UNAVAILABLE") return "errors.serverUnavailable";
+  if (
+    normalized.code === TRANSPORT_ERROR_CODES.CONNECTION_LOST ||
+    normalized.code === LEGACY_ERROR_CODES.SERVER_UNAVAILABLE
+  ) {
+    return "errors.serverUnavailable";
+  }
   return "errors.createFailed";
 }

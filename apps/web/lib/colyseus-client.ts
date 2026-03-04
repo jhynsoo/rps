@@ -1,11 +1,20 @@
 "use client";
 
 import {
+  JOIN_ERROR_CODES,
   RECONNECT_STORAGE_KEY,
   RECONNECT_TOKEN_TTL_MS,
+  TRANSPORT_ERROR_CODES,
   type ReconnectSnapshot,
 } from "@rps/contracts";
 import { Client, type Room } from "colyseus.js";
+
+import {
+  LEGACY_ERROR_CODES,
+  WEB_COMPAT_ERROR_CODES,
+  type CompatErrorCode,
+  type ErrorEnvelope,
+} from "@/lib/error-contract";
 
 type NicknameOptions = {
   nickname: string;
@@ -13,24 +22,25 @@ type NicknameOptions = {
 
 export type ColyseusBoundary = "create" | "join" | "reconnect";
 
-export type ColyseusBoundaryErrorCode =
-  | "CLIENT_ONLY"
-  | "SERVER_UNAVAILABLE"
-  | "ROOM_NOT_FOUND"
-  | "ROOM_FULL"
-  | "RECONNECT_TOKEN_INVALID"
-  | "RECONNECT_TOKEN_EXPIRED"
-  | "UNKNOWN";
+export type ColyseusBoundaryErrorCode = CompatErrorCode;
 
-export type ColyseusBoundaryError = {
+export type ColyseusBoundaryError = Omit<ErrorEnvelope, "boundary"> & {
   boundary: ColyseusBoundary;
-  code: ColyseusBoundaryErrorCode;
-  message: string;
   rawMessage: string;
   cause: unknown;
 };
 
 const DEFAULT_PORT = 2567;
+const SERVER_UNAVAILABLE_HINTS = [
+  "websocket",
+  "network",
+  "econnrefused",
+  "enotfound",
+  "timeout",
+  "timed out",
+  "failed to fetch",
+  "connect failed",
+];
 
 let clientSingleton: Client | null = null;
 
@@ -92,6 +102,96 @@ export async function reconnectRoom(token: string): Promise<Room> {
   }
 }
 
+type ErrorParts = {
+  rawCode: number | null;
+  rawMessage: string;
+  normalizedMessage: string;
+};
+
+function hasHint(message: string, hints: readonly string[]) {
+  return hints.some((hint) => message.includes(hint));
+}
+
+function readErrorParts(error: unknown): ErrorParts {
+  const record =
+    typeof error === "object" && error !== null
+      ? (error as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+
+  const codeFromNumber = typeof record.code === "number" ? record.code : null;
+  const codeFromString =
+    typeof record.code === "string" && /^\d+$/.test(record.code.trim())
+      ? Number(record.code)
+      : null;
+
+  const rawCode = codeFromNumber ?? codeFromString;
+
+  const rawMessage =
+    typeof record.message === "string"
+      ? record.message
+      : error instanceof Error
+        ? error.message
+        : String(error ?? "");
+
+  return {
+    rawCode,
+    rawMessage,
+    normalizedMessage: rawMessage.trim().toLowerCase(),
+  };
+}
+
+function mapDeterministicErrorCode(
+  boundary: ColyseusBoundary,
+  parts: ErrorParts,
+): CompatErrorCode | null {
+  if (parts.normalizedMessage.includes("window is undefined")) {
+    return LEGACY_ERROR_CODES.CLIENT_ONLY;
+  }
+
+  if (hasHint(parts.normalizedMessage, SERVER_UNAVAILABLE_HINTS)) {
+    return TRANSPORT_ERROR_CODES.CONNECTION_LOST;
+  }
+
+  if (boundary === "join" && parts.rawCode === 4212) {
+    const hasNotFound = parts.normalizedMessage.includes("not found");
+    const hasLocked = parts.normalizedMessage.includes("locked");
+
+    if (hasNotFound && !hasLocked) return LEGACY_ERROR_CODES.ROOM_NOT_FOUND;
+    if (hasLocked && !hasNotFound) return LEGACY_ERROR_CODES.ROOM_NOT_FOUND;
+
+    return WEB_COMPAT_ERROR_CODES.UNKNOWN;
+  }
+
+  if (boundary === "join" && parts.rawCode === 4213) {
+    return JOIN_ERROR_CODES.ROOM_FULL;
+  }
+
+  if (boundary === "reconnect" && parts.rawCode === 4214) {
+    return TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED;
+  }
+
+  // Legacy textual fallbacks for compatibility with non-coded errors.
+  if (boundary === "join") {
+    if (parts.normalizedMessage.includes("maxclients") || parts.normalizedMessage.includes("full")) {
+      return LEGACY_ERROR_CODES.ROOM_FULL;
+    }
+    if (parts.normalizedMessage.includes("not found")) {
+      return LEGACY_ERROR_CODES.ROOM_NOT_FOUND;
+    }
+  }
+
+  if (boundary === "reconnect") {
+    if (parts.normalizedMessage.includes("expired")) {
+      return LEGACY_ERROR_CODES.RECONNECT_TOKEN_EXPIRED;
+    }
+    if (parts.normalizedMessage.includes("invalid") || parts.normalizedMessage.includes("malformed")) {
+      return LEGACY_ERROR_CODES.RECONNECT_TOKEN_INVALID;
+    }
+  }
+
+  return null;
+}
+
 export function normalizeColyseusError(
   error: unknown,
   boundary: ColyseusBoundary,
@@ -100,32 +200,15 @@ export function normalizeColyseusError(
     return error;
   }
 
-  const rawMessage = error instanceof Error ? error.message : String(error ?? "");
-  const message = rawMessage.trim();
-
-  let code: ColyseusBoundaryErrorCode = "UNKNOWN";
-
-  if (/window is undefined|must be called on the client|client side/i.test(message)) {
-    code = "CLIENT_ONLY";
-  } else if (
-    /websocket|network|ECONNREFUSED|ENOTFOUND|timeout|timed out|failed to fetch|connect failed/i.test(
-      message,
-    )
-  ) {
-    code = "SERVER_UNAVAILABLE";
-  } else if (boundary === "join") {
-    if (/full|maxClients|seat|locked/i.test(message)) code = "ROOM_FULL";
-    if (/not found|roomId|invalid|no such/i.test(message)) code = "ROOM_NOT_FOUND";
-  } else if (boundary === "reconnect") {
-    if (/invalid|format|malformed/i.test(message)) code = "RECONNECT_TOKEN_INVALID";
-    else if (/expired|not found|no such/i.test(message)) code = "RECONNECT_TOKEN_EXPIRED";
-  }
+  const parts = readErrorParts(error);
+  const code = mapDeterministicErrorCode(boundary, parts) ?? WEB_COMPAT_ERROR_CODES.UNKNOWN;
 
   return {
     boundary,
     code,
-    message,
-    rawMessage,
+    message: parts.rawMessage,
+    rawMessage: parts.rawMessage,
+    rawCode: parts.rawCode,
     cause: error,
   };
 }

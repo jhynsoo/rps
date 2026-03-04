@@ -2,6 +2,7 @@
 
 import type { Room } from "colyseus.js";
 import { create } from "zustand";
+import { SERVER_MESSAGE_TYPES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import {
   clearReconnectSnapshot,
   createReconnectSnapshot,
@@ -11,6 +12,12 @@ import {
   readReconnectSnapshotStatus,
   reconnectRoom,
 } from "@/lib/colyseus-client";
+import {
+  WEB_COMPAT_ERROR_CODES,
+  coerceErrorEnvelope,
+  type ErrorEnvelope,
+} from "@/lib/error-contract";
+import { safeLeave } from "@/lib/safe-leave";
 
 type GameStoreState = {
   room: Room | null;
@@ -18,6 +25,7 @@ type GameStoreState = {
   leaveError: "errors.serverUnavailable" | null;
   reconnectState: "idle" | "trying" | "succeeded" | "failed";
   reconnectError: "expired" | "invalid" | "network" | null;
+  lastErrorEnvelope: ErrorEnvelope | null;
   setRoom: (room: Room) => void;
   clearRoom: () => void;
   leaveRoom: () => Promise<void>;
@@ -64,6 +72,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   leaveError: null,
   reconnectState: "idle",
   reconnectError: null,
+  lastErrorEnvelope: null,
   setRoom: (room) => {
     set({
       room,
@@ -71,6 +80,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       leaveError: null,
       reconnectError: null,
       reconnectState: "idle",
+      lastErrorEnvelope: null,
     });
     clearReconnectSnapshot();
 
@@ -82,12 +92,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (leaveListenersAttached.has(room)) return;
     leaveListenersAttached.add(room);
 
+    room.onMessage(SERVER_MESSAGE_TYPES.ERROR, (payload: unknown) => {
+      const envelope = coerceErrorEnvelope(payload);
+      set((s) => {
+        if (s.room !== room) return s;
+        return { ...s, lastErrorEnvelope: envelope };
+      });
+    });
+
+    room.onError((code, message) => {
+      const normalizedMessage = message ?? "";
+      const envelope: ErrorEnvelope = {
+        boundary: "transport",
+        code:
+          code === 4214 ? TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED : WEB_COMPAT_ERROR_CODES.UNKNOWN,
+        message: normalizedMessage,
+        rawCode: code,
+        rawMessage: normalizedMessage,
+      };
+
+      set((s) => {
+        if (s.room !== room) return s;
+        return { ...s, lastErrorEnvelope: envelope };
+      });
+    });
+
     if (typeof window !== "undefined") {
       const pageHideHandler = () => {
-        void room.leave(false);
+        void safeLeave(room, false);
       };
       const forceDisconnectHandler: EventListener = () => {
-        void room.leave(false);
+        void safeLeave(room, false);
       };
 
       pageHideHandlers.set(room, pageHideHandler);
@@ -128,6 +163,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       leaveError: null,
       reconnectState: "idle",
       reconnectError: null,
+      lastErrorEnvelope: null,
     });
   },
   leaveRoom: async () => {
@@ -151,8 +187,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       leaveError: null,
       reconnectState: "idle",
       reconnectError: null,
+      lastErrorEnvelope: null,
     });
-    if (current) await current.leave();
+    await safeLeave(current);
   },
   attemptReconnect: async (roomId) => {
     set({ reconnectState: "trying", reconnectError: null });
@@ -186,11 +223,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       clearReconnectSnapshot();
       const normalized = normalizeColyseusError(error, "reconnect");
       const reconnectError =
-        normalized.code === "RECONNECT_TOKEN_INVALID"
-          ? "invalid"
-          : normalized.code === "RECONNECT_TOKEN_EXPIRED"
-            ? "expired"
-            : "network";
+        normalized.code === TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED ? "expired" : "network";
 
       set({
         reconnectState: "failed",

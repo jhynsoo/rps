@@ -1,11 +1,14 @@
 "use client";
 import type { Room } from "colyseus.js";
+import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { joinRoomById, normalizeColyseusError } from "@/lib/colyseus-client";
+import { LEGACY_ERROR_CODES } from "@/lib/error-contract";
 import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { safeLeave } from "@/lib/safe-leave";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
 export default function JoinRoomPage() {
@@ -60,9 +63,19 @@ export default function JoinRoomPage() {
 
   function mapJoinErrorToKey(e: unknown) {
     const normalized = normalizeColyseusError(e, "join");
-    if (normalized.code === "ROOM_FULL") return "errors.roomFull";
-    if (normalized.code === "ROOM_NOT_FOUND") return "errors.roomNotFound";
-    if (normalized.code === "SERVER_UNAVAILABLE") return "errors.serverUnavailable";
+    if (
+      normalized.code === JOIN_ERROR_CODES.ROOM_FULL ||
+      normalized.code === LEGACY_ERROR_CODES.ROOM_FULL
+    ) {
+      return "errors.roomFull";
+    }
+    if (
+      normalized.code === TRANSPORT_ERROR_CODES.CONNECTION_LOST ||
+      normalized.code === LEGACY_ERROR_CODES.SERVER_UNAVAILABLE
+    ) {
+      return "errors.serverUnavailable";
+    }
+    if (normalized.code === LEGACY_ERROR_CODES.ROOM_NOT_FOUND) return "errors.roomNotFound";
     return "errors.joinFailed";
   }
 
@@ -90,7 +103,7 @@ export default function JoinRoomPage() {
       const joined = await joinRoomById(roomId, { nickname });
 
       if (!mountedRef.current) {
-        void joined.leave();
+        void safeLeave(joined);
         return;
       }
 

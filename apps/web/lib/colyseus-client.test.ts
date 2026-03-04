@@ -1,41 +1,69 @@
 import { describe, expect, it } from "vitest";
+import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 
+import { LEGACY_ERROR_CODES, WEB_COMPAT_ERROR_CODES } from "@/lib/error-contract";
 import { normalizeColyseusError } from "@/lib/colyseus-client";
 
 describe("normalizeColyseusError", () => {
-  it("maps join room-not-found errors", () => {
-    const normalized = normalizeColyseusError(new Error("roomId not found"), "join");
-    expect(normalized.code).toBe("ROOM_NOT_FOUND");
+  it("maps 4212 + not found to legacy ROOM_NOT_FOUND", () => {
+    const normalized = normalizeColyseusError(
+      { code: 4212, message: "matchmake error: room not found" },
+      "join",
+    );
+
+    expect(normalized.code).toBe(LEGACY_ERROR_CODES.ROOM_NOT_FOUND);
   });
 
-  it("maps join room-full errors", () => {
-    const normalized = normalizeColyseusError(new Error("maxClients reached"), "join");
-    expect(normalized.code).toBe("ROOM_FULL");
+  it("maps 4212 + locked to legacy ROOM_NOT_FOUND", () => {
+    const normalized = normalizeColyseusError(
+      { code: 4212, message: "matchmake error: room is locked" },
+      "join",
+    );
+
+    expect(normalized.code).toBe(LEGACY_ERROR_CODES.ROOM_NOT_FOUND);
   });
 
-  it("maps boundary-specific reconnect token errors", () => {
-    const invalid = normalizeColyseusError(
-      new Error("Invalid reconnection token format"),
+  it("maps ambiguous 4212 to unknown compatibility code", () => {
+    const normalized = normalizeColyseusError(
+      { code: 4212, message: "matchmake error" },
+      "join",
+    );
+
+    expect(normalized.code).toBe(WEB_COMPAT_ERROR_CODES.UNKNOWN);
+  });
+
+  it("maps 4213 to join.room_full", () => {
+    const normalized = normalizeColyseusError(
+      { code: 4213, message: "already full" },
+      "join",
+    );
+
+    expect(normalized.code).toBe(JOIN_ERROR_CODES.ROOM_FULL);
+  });
+
+  it("maps 4214 to transport.reconnect_expired", () => {
+    const normalized = normalizeColyseusError(
+      { code: 4214, message: "reconnection token expired" },
       "reconnect",
     );
-    const expired = normalizeColyseusError(new Error("token expired"), "reconnect");
 
-    expect(invalid.code).toBe("RECONNECT_TOKEN_INVALID");
-    expect(expired.code).toBe("RECONNECT_TOKEN_EXPIRED");
+    expect(normalized.code).toBe(TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED);
   });
 
   it("maps network failures for create/join/reconnect", () => {
     expect(normalizeColyseusError(new Error("ECONNREFUSED"), "create").code).toBe(
-      "SERVER_UNAVAILABLE",
+      TRANSPORT_ERROR_CODES.CONNECTION_LOST,
     );
-    expect(normalizeColyseusError(new Error("timeout"), "join").code).toBe("SERVER_UNAVAILABLE");
+    expect(normalizeColyseusError(new Error("timeout"), "join").code).toBe(
+      TRANSPORT_ERROR_CODES.CONNECTION_LOST,
+    );
     expect(normalizeColyseusError(new Error("websocket closed"), "reconnect").code).toBe(
-      "SERVER_UNAVAILABLE",
+      TRANSPORT_ERROR_CODES.CONNECTION_LOST,
     );
   });
 
-  it("returns UNKNOWN for unmatched errors", () => {
+  it("returns unknown for unmatched errors", () => {
     const normalized = normalizeColyseusError(new Error("unexpected failure"), "create");
-    expect(normalized.code).toBe("UNKNOWN");
+    expect(normalized.code).toBe(WEB_COMPAT_ERROR_CODES.UNKNOWN);
   });
 });

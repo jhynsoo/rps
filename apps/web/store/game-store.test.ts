@@ -1,4 +1,5 @@
 import type { Room } from "colyseus.js";
+import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,6 +11,8 @@ import {
   readReconnectSnapshotStatus,
   reconnectRoom,
 } from "@/lib/colyseus-client";
+import { WEB_COMPAT_ERROR_CODES } from "@/lib/error-contract";
+import { safeLeave } from "@/lib/safe-leave";
 import {
   isActionBlockedByLeaveError,
   type LeaveErrorAction,
@@ -23,9 +26,9 @@ vi.mock("@/lib/colyseus-client", () => ({
   normalizeColyseusError: vi.fn((error: unknown) => ({
     boundary: "reconnect",
     code:
-      error instanceof Error && /invalid/i.test(error.message)
-        ? "RECONNECT_TOKEN_INVALID"
-        : "UNKNOWN",
+      error instanceof Error && /expired/i.test(error.message)
+        ? TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED
+        : WEB_COMPAT_ERROR_CODES.UNKNOWN,
     message: error instanceof Error ? error.message : String(error ?? ""),
     rawMessage: error instanceof Error ? error.message : String(error ?? ""),
     cause: error,
@@ -36,10 +39,18 @@ vi.mock("@/lib/colyseus-client", () => ({
   reconnectRoom: vi.fn(),
 }));
 
+vi.mock("@/lib/safe-leave", () => ({
+  safeLeave: vi.fn(async () => {}),
+}));
+
 type RoomCallback = () => void;
+type RoomErrorCallback = (code: number, message: string) => void;
+type RoomMessageCallback = (payload: unknown) => void;
 
 function createMockRoom(roomId: string, reconnectionToken?: string) {
   let leaveCallback: RoomCallback | null = null;
+  let errorCallback: RoomErrorCallback | null = null;
+  let messageCallback: RoomMessageCallback | null = null;
 
   const room = {
     roomId,
@@ -48,6 +59,12 @@ function createMockRoom(roomId: string, reconnectionToken?: string) {
     onLeave: (callback: RoomCallback) => {
       leaveCallback = callback;
     },
+    onError: (callback: RoomErrorCallback) => {
+      errorCallback = callback;
+    },
+    onMessage: (_type: "error", callback: RoomMessageCallback) => {
+      messageCallback = callback;
+    },
     leave: vi.fn(async () => {}),
   } as unknown as Room;
 
@@ -55,6 +72,12 @@ function createMockRoom(roomId: string, reconnectionToken?: string) {
     room,
     emitLeave: () => {
       leaveCallback?.();
+    },
+    emitError: (code: number, message: string) => {
+      errorCallback?.(code, message);
+    },
+    emitMessage: (payload: unknown) => {
+      messageCallback?.(payload);
     },
   };
 }
@@ -67,6 +90,7 @@ describe("useGameStore", () => {
       leaveError: null,
       reconnectState: "idle",
       reconnectError: null,
+      lastErrorEnvelope: null,
     });
 
     vi.clearAllMocks();
@@ -79,6 +103,38 @@ describe("useGameStore", () => {
 
     expect(useGameStore.getState().roomId).toBe("room-123");
     expect(useGameStore.getState().room).toBe(mockRoom.room);
+  });
+
+  it("stores room error envelope from room.onMessage('error')", () => {
+    const mockRoom = createMockRoom("room-error-message");
+
+    useGameStore.getState().setRoom(mockRoom.room);
+    mockRoom.emitMessage({
+      boundary: "join",
+      code: JOIN_ERROR_CODES.ROOM_FULL,
+      message: "already full",
+    });
+
+    expect(useGameStore.getState().lastErrorEnvelope).toEqual({
+      boundary: "join",
+      code: JOIN_ERROR_CODES.ROOM_FULL,
+      message: "already full",
+    });
+  });
+
+  it("stores room error envelope from room.onError", () => {
+    const mockRoom = createMockRoom("room-error-code");
+
+    useGameStore.getState().setRoom(mockRoom.room);
+    mockRoom.emitError(4214, "reconnect expired");
+
+    expect(useGameStore.getState().lastErrorEnvelope).toEqual({
+      boundary: "transport",
+      code: TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED,
+      message: "reconnect expired",
+      rawCode: 4214,
+      rawMessage: "reconnect expired",
+    });
   });
 
   it("persists reconnect snapshot and sets leaveError on room leave", () => {
@@ -105,10 +161,11 @@ describe("useGameStore", () => {
     await useGameStore.getState().leaveRoom();
 
     expect(clearReconnectSnapshot).toHaveBeenCalledTimes(2);
-    expect(mockRoom.room.leave).toHaveBeenCalledTimes(1);
+    expect(safeLeave).toHaveBeenCalledWith(mockRoom.room);
     expect(useGameStore.getState().room).toBeNull();
     expect(useGameStore.getState().roomId).toBeNull();
     expect(useGameStore.getState().leaveError).toBeNull();
+    expect(useGameStore.getState().lastErrorEnvelope).toBeNull();
   });
 
   it("attemptReconnect succeeds and refreshes snapshot", async () => {
@@ -153,27 +210,27 @@ describe("useGameStore", () => {
     expect(useGameStore.getState().leaveError).toBe(leaveErrorDisconnected);
   });
 
-  it("attemptReconnect marks invalid token errors", async () => {
+  it("attemptReconnect maps reconnect.expired", async () => {
     vi.mocked(readReconnectSnapshotStatus).mockReturnValue("ok");
     vi.mocked(readReconnectSnapshot).mockReturnValue({
-      roomId: "room-invalid",
-      token: "room-invalid:bad",
+      roomId: "room-expired-via-error",
+      token: "room-expired-via-error:token",
       expiresAt: Date.now() + 600000,
     });
-    vi.mocked(reconnectRoom).mockRejectedValue(new Error("Invalid reconnection token format"));
+    vi.mocked(reconnectRoom).mockRejectedValue(new Error("expired"));
     vi.mocked(normalizeColyseusError).mockReturnValue({
       boundary: "reconnect",
-      code: "RECONNECT_TOKEN_INVALID",
-      message: "Invalid reconnection token format",
-      rawMessage: "Invalid reconnection token format",
-      cause: new Error("Invalid reconnection token format"),
+      code: TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED,
+      message: "expired",
+      rawMessage: "expired",
+      cause: new Error("expired"),
     });
 
-    const result = await useGameStore.getState().attemptReconnect("room-invalid");
+    const result = await useGameStore.getState().attemptReconnect("room-expired-via-error");
 
     expect(result).toBe(false);
     expect(useGameStore.getState().reconnectState).toBe("failed");
-    expect(useGameStore.getState().reconnectError).toBe("invalid");
+    expect(useGameStore.getState().reconnectError).toBe("expired");
     expect(clearReconnectSnapshot).toHaveBeenCalledTimes(1);
   });
 
@@ -187,7 +244,7 @@ describe("useGameStore", () => {
     vi.mocked(reconnectRoom).mockRejectedValue(new Error("ECONNREFUSED"));
     vi.mocked(normalizeColyseusError).mockReturnValue({
       boundary: "reconnect",
-      code: "SERVER_UNAVAILABLE",
+      code: TRANSPORT_ERROR_CODES.CONNECTION_LOST,
       message: "ECONNREFUSED",
       rawMessage: "ECONNREFUSED",
       cause: new Error("ECONNREFUSED"),
