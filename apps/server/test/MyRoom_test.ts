@@ -642,6 +642,30 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(reconnectedClient.sessionId, client1.sessionId);
     });
 
+    it("blocks host mode selection while opponent is in reconnect grace", async function () {
+      this.timeout(15000);
+
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+      const host = await colyseus.connectTo(room);
+      const opponent = await colyseus.connectTo(room);
+      await room.waitForNextPatch();
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      await opponent.leave(false);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      assert.strictEqual(room.clients.length, 1);
+      assert.strictEqual(room.state.players.size, 2);
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+
+      host.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      assert.strictEqual(room.state.gameMode, "");
+      assert.strictEqual(room.state.gameStatus, "mode_select");
+    });
+
     it("finalizes match when mode_select reconnect grace expires", async function () {
       this.timeout(25000);
 

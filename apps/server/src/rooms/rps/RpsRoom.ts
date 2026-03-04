@@ -38,6 +38,7 @@ export class RpsRoom extends Room<RpsRoomState> {
 
     this.onMessage(CLIENT_MESSAGE_TYPES.SELECT_MODE, (client, message: unknown) => {
       if (this.state.gameStatus !== LOBBY_GAME_STATUS) return;
+      if (this.clients.length !== this.maxClients) return;
       if (client.sessionId !== this.state.hostSessionId) return;
       if (!isSelectModeMessage(message)) return;
       if (!isValidMode(message.mode)) return;
