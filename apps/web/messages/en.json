@@ -153,6 +153,10 @@
       "serverUnavailable": "Server is unavailable.",
       "roomNotFound": "Room not found.",
       "roomFull": "Room is full.",
+      "joinUnavailable": "Failed to join or restore the room session.",
+      "reconnectExpired": "Reconnect session expired. Please join again.",
+      "reconnectInvalid": "Reconnect session is invalid. Please join again.",
+      "actionRejected": "The requested action was rejected by the room state.",
       "createFailed": "Failed to create room.",
       "joinFailed": "Failed to join room."
     }

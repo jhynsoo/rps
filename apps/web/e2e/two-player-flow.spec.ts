@@ -327,3 +327,34 @@ test("reconnect resume with token restores active game session", async ({ browse
     await closePlayerSession(session);
   }
 });
+
+test("reconnect snapshot mismatch falls back to join-unavailable error", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const urlRoomId = "mismatch-room-id";
+
+  try {
+    await page.goto("/");
+    await page.evaluate((roomId) => {
+      window.localStorage.setItem(
+        "rps:reconnect:v1",
+        JSON.stringify({
+          roomId: `${roomId}-other`,
+          token: "snapshot-mismatch-token",
+          expiresAt: Date.now() + 60_000,
+        }),
+      );
+    }, urlRoomId);
+
+    await page.goto(`/game/${urlRoomId}`);
+
+    await expect(page.getByText("No active room")).toBeVisible({
+      timeout: WS_TIMEOUT_MS,
+    });
+    await expect(page.getByText("Failed to join or restore the room session.")).toBeVisible({
+      timeout: WS_TIMEOUT_MS,
+    });
+  } finally {
+    await context.close();
+  }
+});

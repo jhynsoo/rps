@@ -6,7 +6,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import type { RpsChoice } from "@/lib/rps";
+import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
+import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -61,6 +63,7 @@ export default function GamePage() {
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
   const leaveError = useGameStore((s) => s.leaveError);
+  const lastErrorEnvelope = useGameStore((s) => s.lastErrorEnvelope);
   const reconnectState = useGameStore((s) => s.reconnectState);
   const reconnectError = useGameStore((s) => s.reconnectError);
   const attemptReconnect = useGameStore((s) => s.attemptReconnect);
@@ -68,12 +71,21 @@ export default function GamePage() {
   useRoomStateVersion(room);
 
   const state = getRenderableState(getState(room));
-  const isMismatch = !!storeRoomId && storeRoomId !== roomId;
+  const gameStatus = state?.gameStatus ?? "";
+  const routeGuard = resolveRoomRouteGuard({
+    page: "game",
+    roomId,
+    room,
+    storeRoomId,
+    hasRenderableState: !!state,
+    gameStatus,
+    reconnectState,
+    reconnectError,
+  });
 
   const players = state ? Array.from(state.players.values()) : [];
   const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
 
-  const gameStatus = state?.gameStatus ?? "";
   const selfChoice = self?.choice ?? "";
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
@@ -85,21 +97,14 @@ export default function GamePage() {
   const [opponentLeft, setOpponentLeft] = useState(false);
 
   useEffect(() => {
-    if (gameStatus !== "waiting" && gameStatus !== "mode_select") return;
-    if (!roomId) return;
-    router.replace(`/room/${roomId}`);
-  }, [gameStatus, roomId, router]);
-
-  useEffect(() => {
-    if (gameStatus !== "result" && gameStatus !== "finished") return;
-    if (!roomId) return;
-    router.replace(`/result/${roomId}`);
-  }, [gameStatus, roomId, router]);
+    if (routeGuard.kind !== "state_redirect") return;
+    router.replace(routeGuard.to);
+  }, [routeGuard.kind, routeGuard.kind === "state_redirect" ? routeGuard.to : "", router]);
 
   useEffect(() => {
     if (room) return;
     if (!roomId) return;
-    if (storeRoomId && storeRoomId !== roomId) return;
+    if (routeGuard.kind === "mismatch") return;
     if (reconnectAttemptedRef.current) return;
 
     reconnectAttemptedRef.current = true;
@@ -110,7 +115,7 @@ export default function GamePage() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [attemptReconnect, room, roomId, storeRoomId]);
+  }, [attemptReconnect, room, roomId, routeGuard.kind]);
 
   useEffect(() => {
     if (gameStatus !== "choosing") return;
@@ -139,7 +144,7 @@ export default function GamePage() {
     return translateMessage(t, rpsChoiceMessage(choice));
   }
 
-  if (!room && reconnectState === "trying" && !isMismatch) {
+  if (routeGuard.kind === "reconnect_trying") {
     return (
       <main className="min-h-dvh bg-background text-foreground">
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
@@ -155,35 +160,20 @@ export default function GamePage() {
     );
   }
 
-  if (room && !state && !isMismatch) {
-    return (
-      <main className="min-h-dvh bg-background text-foreground">
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
-              <p className="font-mono text-xs text-muted-foreground">{t("title")}</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">{t("reconnecting")}</h1>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!room || isMismatch) {
-    const title = !room
-      ? t("errorNoActiveRoom")
-      : isMismatch
+  if (routeGuard.kind === "mismatch" || routeGuard.kind === "no_room") {
+    const title =
+      routeGuard.kind === "mismatch"
         ? t("errorMismatch")
-        : t("errorUnavailable");
-    const detail = !room
-      ? reconnectError === "expired"
-        ? t("detailReconnectExpired")
-        : t("detailNeedsReconnect")
-      : isMismatch
-        ? t("detailMismatch", { activeRoomId: storeRoomId ?? "-", urlRoomId: roomId || "-" })
-        : t("detailMissingState");
+        : room
+          ? t("errorUnavailable")
+          : t("errorNoActiveRoom");
+    const detail =
+      routeGuard.kind === "mismatch"
+        ? t("detailMismatch", {
+            activeRoomId: routeGuard.activeRoomId,
+            urlRoomId: routeGuard.urlRoomId,
+          })
+        : t(`errors.${routeGuard.contractError}` as never);
 
     return (
       <main className="min-h-dvh bg-background text-foreground">
@@ -217,19 +207,18 @@ export default function GamePage() {
 
   const isMultiRound = state.gameMode === "best_of_3" || state.gameMode === "best_of_5";
 
-  const activeRoom = room;
-
   const canChoose =
     !isActionBlockedByLeaveError("choice-rock", leaveError) &&
     gameStatus === "choosing" &&
+    !!room &&
     !!self &&
     selfChoice === "" &&
     choiceSent === null;
 
   function sendChoice(choice: RpsChoice) {
-    if (!canChoose) return;
+    if (!canChoose || !room) return;
     setChoiceSent(choice);
-    activeRoom.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice });
+    room.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice });
   }
 
   return (
@@ -264,6 +253,12 @@ export default function GamePage() {
 
             {leaveError ? (
               <p className="mt-4 text-sm text-destructive">{tGame(leaveError as never)}</p>
+            ) : null}
+
+            {!leaveError && lastErrorEnvelope ? (
+              <p className="mt-4 text-sm text-destructive">
+                {tGame(resolveContractErrorMessageKey(lastErrorEnvelope.code) as never)}
+              </p>
             ) : null}
 
             {!leaveError && opponentLeft ? (

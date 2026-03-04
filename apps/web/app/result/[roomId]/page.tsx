@@ -5,7 +5,9 @@ import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
+import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { gameModeMessage, gameStatusMessage } from "@/lib/rps-i18n";
+import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -67,6 +69,7 @@ export default function ResultPage() {
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
   const leaveError = useGameStore((s) => s.leaveError);
+  const lastErrorEnvelope = useGameStore((s) => s.lastErrorEnvelope);
   const reconnectState = useGameStore((s) => s.reconnectState);
   const reconnectError = useGameStore((s) => s.reconnectError);
   const attemptReconnect = useGameStore((s) => s.attemptReconnect);
@@ -74,34 +77,36 @@ export default function ResultPage() {
   useRoomStateVersion(room);
 
   const state = getRenderableState(getState(room));
-  const isMismatch = !!storeRoomId && storeRoomId !== roomId;
+  const gameStatus = state?.gameStatus ?? "";
+  const routeGuard = resolveRoomRouteGuard({
+    page: "result",
+    roomId,
+    room,
+    storeRoomId,
+    hasRenderableState: !!state,
+    gameStatus,
+    reconnectState,
+    reconnectError,
+  });
 
   const players = state ? Array.from(state.players.values()) : [];
   const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
   const opponent = room ? (players.find((p) => p.sessionId !== room.sessionId) ?? null) : null;
 
-  const gameStatus = state?.gameStatus ?? "";
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
 
   const reconnectAttemptedRef = useRef(false);
 
   useEffect(() => {
-    if (gameStatus !== "waiting" && gameStatus !== "mode_select") return;
-    if (!roomId) return;
-    router.replace(`/room/${roomId}`);
-  }, [gameStatus, roomId, router]);
-
-  useEffect(() => {
-    if (gameStatus !== "choosing") return;
-    if (!roomId) return;
-    router.replace(`/game/${roomId}`);
-  }, [gameStatus, roomId, router]);
+    if (routeGuard.kind !== "state_redirect") return;
+    router.replace(routeGuard.to);
+  }, [routeGuard.kind, routeGuard.kind === "state_redirect" ? routeGuard.to : "", router]);
 
   useEffect(() => {
     if (room) return;
     if (!roomId) return;
-    if (storeRoomId && storeRoomId !== roomId) return;
+    if (routeGuard.kind === "mismatch") return;
     if (reconnectAttemptedRef.current) return;
 
     reconnectAttemptedRef.current = true;
@@ -112,7 +117,7 @@ export default function ResultPage() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [attemptReconnect, room, roomId, storeRoomId]);
+  }, [attemptReconnect, room, roomId, routeGuard.kind]);
 
   async function onBackToMenu() {
     try {
@@ -122,7 +127,7 @@ export default function ResultPage() {
     }
   }
 
-  if (!room && reconnectState === "trying" && !isMismatch) {
+  if (routeGuard.kind === "reconnect_trying") {
     return (
       <main className="min-h-dvh bg-background text-foreground">
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
@@ -138,35 +143,20 @@ export default function ResultPage() {
     );
   }
 
-  if (room && !state && !isMismatch) {
-    return (
-      <main className="min-h-dvh bg-background text-foreground">
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
-              <p className="font-mono text-xs text-muted-foreground">{t("title")}</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">{t("reconnecting")}</h1>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!room || isMismatch) {
-    const title = !room
-      ? t("errorNoActiveRoom")
-      : isMismatch
+  if (routeGuard.kind === "mismatch" || routeGuard.kind === "no_room") {
+    const title =
+      routeGuard.kind === "mismatch"
         ? t("errorMismatch")
-        : t("errorUnavailable");
-    const detail = !room
-      ? reconnectError === "expired"
-        ? t("detailReconnectExpired")
-        : t("detailNeedsReconnect")
-      : isMismatch
-        ? t("detailMismatch", { activeRoomId: storeRoomId ?? "-", urlRoomId: roomId || "-" })
-        : t("detailMissingState");
+        : room
+          ? t("errorUnavailable")
+          : t("errorNoActiveRoom");
+    const detail =
+      routeGuard.kind === "mismatch"
+        ? t("detailMismatch", {
+            activeRoomId: routeGuard.activeRoomId,
+            urlRoomId: routeGuard.urlRoomId,
+          })
+        : t(`errors.${routeGuard.contractError}` as never);
 
     return (
       <main className="min-h-dvh bg-background text-foreground">
@@ -238,6 +228,12 @@ export default function ResultPage() {
               <p className="mt-4 text-sm text-destructive">{t(leaveError as never)}</p>
             ) : null}
 
+            {!leaveError && lastErrorEnvelope ? (
+              <p className="mt-4 text-sm text-destructive">
+                {t(resolveContractErrorMessageKey(lastErrorEnvelope.code) as never)}
+              </p>
+            ) : null}
+
             <div className="mt-6 rounded-2xl border border-border bg-background/60 p-4">
               <p className="text-xs font-medium text-muted-foreground">{t("result.roomLabel")}</p>
               <p className="mt-1 font-mono text-lg">{roomId || "-"}</p>
@@ -279,10 +275,13 @@ export default function ResultPage() {
                   type="button"
                   data-testid="rematch-ready"
                   disabled={
-                    isActionBlockedByLeaveError("rematch-ready", leaveError) || !isFinished || !self
+                    isActionBlockedByLeaveError("rematch-ready", leaveError) ||
+                    !isFinished ||
+                    !self ||
+                    !room
                   }
                   onClick={() => {
-                    if (!isFinished || !self) return;
+                    if (!isFinished || !self || !room) return;
                     room.send(
                       selfReady
                         ? CLIENT_MESSAGE_TYPES.REMATCH_CANCEL

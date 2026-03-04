@@ -7,7 +7,9 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import type { GameMode } from "@/lib/rps";
+import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { gameStatusMessage } from "@/lib/rps-i18n";
+import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -66,6 +68,7 @@ export default function RoomLobbyPage() {
   const room = useGameStore((s) => s.room);
   const storeRoomId = useGameStore((s) => s.roomId);
   const leaveError = useGameStore((s) => s.leaveError);
+  const lastErrorEnvelope = useGameStore((s) => s.lastErrorEnvelope);
   const reconnectState = useGameStore((s) => s.reconnectState);
   const reconnectError = useGameStore((s) => s.reconnectError);
   const attemptReconnect = useGameStore((s) => s.attemptReconnect);
@@ -73,7 +76,17 @@ export default function RoomLobbyPage() {
   useRoomStateVersion(room);
 
   const state = getRenderableState(getState(room));
-  const isMismatch = !!storeRoomId && storeRoomId !== roomId;
+  const gameStatus = state?.gameStatus ?? "";
+  const routeGuard = resolveRoomRouteGuard({
+    page: "room",
+    roomId,
+    room,
+    storeRoomId,
+    hasRenderableState: !!state,
+    gameStatus,
+    reconnectState,
+    reconnectError,
+  });
 
   const players = state ? Array.from(state.players.values()) : [];
   const isHost = !!room && !!state && room.sessionId === state.hostSessionId;
@@ -92,8 +105,6 @@ export default function RoomLobbyPage() {
   const hadTwoPlayersRef = useRef(false);
   const [opponentLeft, setOpponentLeft] = useState(false);
 
-  const gameStatus = state?.gameStatus ?? "";
-
   useEffect(() => {
     const size = state?.players.size ?? 0;
     if (size === 2) {
@@ -104,21 +115,14 @@ export default function RoomLobbyPage() {
   }, [state?.players?.size]);
 
   useEffect(() => {
-    if (gameStatus !== "choosing") return;
-    if (!roomId) return;
-    router.replace(`/game/${roomId}`);
-  }, [gameStatus, roomId, router]);
-
-  useEffect(() => {
-    if (gameStatus !== "result" && gameStatus !== "finished") return;
-    if (!roomId) return;
-    router.replace(`/result/${roomId}`);
-  }, [gameStatus, roomId, router]);
+    if (routeGuard.kind !== "state_redirect") return;
+    router.replace(routeGuard.to);
+  }, [routeGuard.kind, routeGuard.kind === "state_redirect" ? routeGuard.to : "", router]);
 
   useEffect(() => {
     if (room) return;
     if (!roomId) return;
-    if (storeRoomId && storeRoomId !== roomId) return;
+    if (routeGuard.kind === "mismatch") return;
     if (reconnectAttemptedRef.current) return;
 
     reconnectAttemptedRef.current = true;
@@ -129,7 +133,7 @@ export default function RoomLobbyPage() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [attemptReconnect, room, roomId, storeRoomId]);
+  }, [attemptReconnect, room, roomId, routeGuard.kind]);
 
   async function onBackToLobby() {
     try {
@@ -152,7 +156,7 @@ export default function RoomLobbyPage() {
     }
   }
 
-  if (!room && reconnectState === "trying" && !isMismatch) {
+  if (routeGuard.kind === "reconnect_trying") {
     return (
       <main className="min-h-dvh bg-background text-foreground">
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
@@ -170,37 +174,20 @@ export default function RoomLobbyPage() {
     );
   }
 
-  if (room && !state && !isMismatch) {
-    return (
-      <main className="min-h-dvh bg-background text-foreground">
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_55%_at_50%_0%,oklch(0.97_0_0)_0%,transparent_60%)]" />
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center px-5 py-12">
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
-              <p className="font-mono text-xs text-muted-foreground">{tRoom("waiting.title")}</p>
-              <h1 className="mt-1 font-mono text-2xl tracking-tight">
-                {tRoom("waiting.reconnecting")}
-              </h1>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!room || isMismatch) {
-    const title = !room
-      ? tRoom("waiting.errorNoActiveRoom")
-      : isMismatch
+  if (routeGuard.kind === "mismatch" || routeGuard.kind === "no_room") {
+    const title =
+      routeGuard.kind === "mismatch"
         ? tRoom("waiting.errorMismatch")
-        : tRoom("waiting.errorUnavailable");
-    const detail = !room
-      ? reconnectError === "expired"
-        ? tRoom("waiting.detailReconnectExpired")
-        : tRoom("waiting.detailNeedsReconnect")
-      : isMismatch
-        ? tGame("detailMismatch", { activeRoomId: storeRoomId ?? "-", urlRoomId: roomId || "-" })
-        : tRoom("waiting.detailMissingState");
+        : room
+          ? tRoom("waiting.errorUnavailable")
+          : tRoom("waiting.errorNoActiveRoom");
+    const detail =
+      routeGuard.kind === "mismatch"
+        ? tGame("detailMismatch", {
+            activeRoomId: routeGuard.activeRoomId,
+            urlRoomId: routeGuard.urlRoomId,
+          })
+        : tGame(`errors.${routeGuard.contractError}` as never);
 
     return (
       <main className="min-h-dvh bg-background text-foreground">
@@ -262,6 +249,12 @@ export default function RoomLobbyPage() {
 
             {leaveError ? (
               <p className="mt-4 text-sm text-destructive">{tGame(leaveError as never)}</p>
+            ) : null}
+
+            {!leaveError && lastErrorEnvelope ? (
+              <p className="mt-4 text-sm text-destructive">
+                {tGame(resolveContractErrorMessageKey(lastErrorEnvelope.code) as never)}
+              </p>
             ) : null}
 
             {!leaveError && opponentLeft ? (
