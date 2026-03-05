@@ -3,12 +3,15 @@ import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import {
   ACTION_ERROR_CODES,
   CLIENT_MESSAGE_TYPES,
-  SERVER_MESSAGE_TYPES,
   type ErrorEnvelope,
+  SERVER_MESSAGE_TYPES,
 } from "@rps/contracts";
 import type { Room } from "colyseus.js";
 
 import appConfig from "../src/app.config";
+import { resolveTestPort } from "./testPort";
+
+const TEST_PORT = resolveTestPort();
 
 function waitForErrorMessage(client: Room, timeoutMs = 500): Promise<ErrorEnvelope> {
   return new Promise((resolve, reject) => {
@@ -29,7 +32,7 @@ describe("RpsRoom error contract", () => {
   let colyseus: ColyseusTestServer;
 
   before(async () => {
-    colyseus = await boot(appConfig);
+    colyseus = await boot(appConfig, TEST_PORT);
   });
 
   after(async () => colyseus.shutdown());

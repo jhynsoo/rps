@@ -8,12 +8,15 @@ import {
 
 import appConfig from "../src/app.config";
 import { MyRoomState, Player } from "../src/rooms/schema/MyRoomState";
+import { resolveTestPort } from "./testPort";
+
+const TEST_PORT = resolveTestPort();
 
 describe("testing your Colyseus app", () => {
   let colyseus: ColyseusTestServer;
 
   before(async () => {
-    colyseus = await boot(appConfig);
+    colyseus = await boot(appConfig, TEST_PORT);
   });
   after(async () => colyseus.shutdown());
   beforeEach(async () => await colyseus.cleanup());

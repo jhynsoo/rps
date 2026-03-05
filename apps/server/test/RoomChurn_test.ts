@@ -4,6 +4,7 @@ import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import appConfig from "../src/app.config";
 import { type RuntimeStatsSnapshot, snapshot } from "../src/observability/runtimeStats";
 import type { MyRoomState } from "../src/rooms/schema/MyRoomState";
+import { resolveTestPort } from "./testPort";
 
 function readIntEnv(name: string, fallback: number, bounds: { min: number; max: number }): number {
   const rawValue = process.env[name];
@@ -51,6 +52,7 @@ const TEST_TIMEOUT_MS = readIntEnv("RPS_CHURN_TEST_TIMEOUT_MS", 90000, {
   min: 10000,
   max: 300000,
 });
+const TEST_PORT = resolveTestPort();
 const NORMAL_CYCLES = readIntEnv("RPS_CHURN_NORMAL_CYCLES", 8, {
   min: 1,
   max: 80,
@@ -345,7 +347,7 @@ describe("Room churn lifecycle + plateau thresholds", () => {
   let colyseus: ColyseusTestServer;
 
   before(async () => {
-    colyseus = await boot(appConfig);
+    colyseus = await boot(appConfig, TEST_PORT);
   });
 
   after(async () => {
