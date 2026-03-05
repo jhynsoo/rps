@@ -77,6 +77,42 @@ jobs:
       - name: Run web unit test suite
         run: pnpm -C apps/web test:unit
 
+  web-e2e-smoke:
+    name: Web E2E smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm -C apps/web exec playwright install --with-deps chromium
+
+      - name: Run web smoke E2E suite
+        env:
+          CI: 'true'
+        run: pnpm -C apps/web test:e2e:smoke
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-smoke-artifacts
+          path: |
+            apps/web/playwright-report/**
+            apps/web/test-results/**
+          if-no-files-found: ignore
+
   server-build:
     name: Server build
     runs-on: ubuntu-latest
