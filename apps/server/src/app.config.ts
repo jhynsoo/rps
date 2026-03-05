@@ -43,7 +43,26 @@ export function isProductionMonitorEnabled(
   monitorUsername: string | undefined,
   monitorPassword: string | undefined,
 ): boolean {
-  return Boolean(monitorUsername && monitorPassword);
+  return Boolean(
+    typeof monitorUsername === "string" &&
+      monitorUsername.length > 0 &&
+      typeof monitorPassword === "string" &&
+      monitorPassword.length > 0,
+  );
+}
+
+function resolveMonitorCredentials(
+  monitorUsername: string | undefined,
+  monitorPassword: string | undefined,
+): { username: string; password: string } | null {
+  if (!monitorUsername || !monitorPassword) {
+    return null;
+  }
+
+  return {
+    username: monitorUsername,
+    password: monitorPassword,
+  };
 }
 
 function decodeBasicAuthorizationHeader(value: string | undefined): {
@@ -149,16 +168,22 @@ export default config({
     }
 
     const isProduction = process.env.NODE_ENV === "production";
-    const monitorUsername = process.env.MONITOR_USERNAME;
-    const monitorPassword = process.env.MONITOR_PASSWORD;
+    const monitorCredentials = resolveMonitorCredentials(
+      process.env.MONITOR_USERNAME,
+      process.env.MONITOR_PASSWORD,
+    );
 
     if (!isProduction) {
       app.use("/monitor", monitor());
       return;
     }
 
-    if (isProductionMonitorEnabled(monitorUsername, monitorPassword)) {
-      app.use("/monitor", createMonitorAuthMiddleware(monitorUsername, monitorPassword), monitor());
+    if (monitorCredentials) {
+      app.use(
+        "/monitor",
+        createMonitorAuthMiddleware(monitorCredentials.username, monitorCredentials.password),
+        monitor(),
+      );
       return;
     }
 
