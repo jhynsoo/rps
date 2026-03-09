@@ -1,3 +1,3 @@
 # RPS
 
-Online Rock Paper Scissors game monorepo.
+Online Rock Paper Scissors game server.
