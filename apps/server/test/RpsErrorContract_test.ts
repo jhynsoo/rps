@@ -78,6 +78,45 @@ describe("RpsRoom error contract", () => {
     await guestClient.leave();
   });
 
+  it("sends INVALID_MODE error for unrecognized game mode", async () => {
+    const room = await colyseus.createRoom("my_room", {});
+    const hostClient = await colyseus.connectTo(room);
+    const guestClient = await colyseus.connectTo(room);
+    await room.waitForNextPatch();
+
+    const errorPromise = waitForErrorMessage(hostClient);
+    hostClient.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "invalid" });
+    const error = await errorPromise;
+
+    assert.strictEqual(error.boundary, "action");
+    assert.strictEqual(error.code, ACTION_ERROR_CODES.INVALID_MODE);
+    assert.strictEqual(error.message, "Invalid game mode.");
+
+    await hostClient.leave();
+    await guestClient.leave();
+  });
+
+  it("sends INVALID_CHOICE error for unrecognized choice", async () => {
+    const room = await colyseus.createRoom("my_room", {});
+    const hostClient = await colyseus.connectTo(room);
+    const guestClient = await colyseus.connectTo(room);
+    await room.waitForNextPatch();
+
+    hostClient.send(CLIENT_MESSAGE_TYPES.SELECT_MODE, { mode: "single" });
+    await room.waitForNextPatch();
+
+    const errorPromise = waitForErrorMessage(hostClient);
+    hostClient.send(CLIENT_MESSAGE_TYPES.CHOICE, { choice: "invalid" });
+    const error = await errorPromise;
+
+    assert.strictEqual(error.boundary, "action");
+    assert.strictEqual(error.code, ACTION_ERROR_CODES.INVALID_CHOICE);
+    assert.strictEqual(error.message, "Invalid choice.");
+
+    await hostClient.leave();
+    await guestClient.leave();
+  });
+
   it("sends ALREADY_CHOSEN error when player submits choice twice", async () => {
     const room = await colyseus.createRoom("my_room", {});
     const hostClient = await colyseus.connectTo(room);
