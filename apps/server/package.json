@@ -1,8 +1,8 @@
 {
   "private": true,
-  "name": "my-app",
+  "name": "server",
   "version": "1.0.0",
-  "description": "npm init template for bootstrapping an empty Colyseus project",
+  "description": "RPS game server powered by Colyseus",
   "main": "build/index.js",
   "engines": {
     "node": ">=24 <25"
@@ -19,12 +19,7 @@
     "clean": "rimraf build",
     "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
-  "author": "",
   "license": "UNLICENSED",
-  "bugs": {
-    "url": "https://github.com/colyseus/create-colyseus/issues"
-  },
-  "homepage": "https://github.com/colyseus/create-colyseus#readme",
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@colyseus/loadtest": "^0.16.0",
