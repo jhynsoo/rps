@@ -1,8 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
-
-import { LEGACY_ERROR_CODES, WEB_COMPAT_ERROR_CODES } from "@/lib/error-contract";
+import { describe, expect, it } from "vitest";
 import { normalizeColyseusError } from "@/lib/colyseus-client";
+import { LEGACY_ERROR_CODES, WEB_COMPAT_ERROR_CODES } from "@/lib/error-contract";
 
 describe("normalizeColyseusError", () => {
   it("maps 4212 + not found to legacy ROOM_NOT_FOUND", () => {
@@ -24,19 +23,13 @@ describe("normalizeColyseusError", () => {
   });
 
   it("maps ambiguous 4212 to unknown compatibility code", () => {
-    const normalized = normalizeColyseusError(
-      { code: 4212, message: "matchmake error" },
-      "join",
-    );
+    const normalized = normalizeColyseusError({ code: 4212, message: "matchmake error" }, "join");
 
     expect(normalized.code).toBe(WEB_COMPAT_ERROR_CODES.UNKNOWN);
   });
 
   it("maps 4213 to join.room_full", () => {
-    const normalized = normalizeColyseusError(
-      { code: 4213, message: "already full" },
-      "join",
-    );
+    const normalized = normalizeColyseusError({ code: 4213, message: "already full" }, "join");
 
     expect(normalized.code).toBe(JOIN_ERROR_CODES.ROOM_FULL);
   });

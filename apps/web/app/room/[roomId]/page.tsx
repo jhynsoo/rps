@@ -5,11 +5,10 @@ import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-
-import type { GameMode } from "@/lib/rps";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
-import { gameStatusMessage } from "@/lib/rps-i18n";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import type { GameMode } from "@/lib/rps";
+import { gameStatusMessage } from "@/lib/rps-i18n";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -117,7 +116,7 @@ export default function RoomLobbyPage() {
   useEffect(() => {
     if (routeGuard.kind !== "state_redirect") return;
     router.replace(routeGuard.to);
-  }, [routeGuard.kind, routeGuard.kind === "state_redirect" ? routeGuard.to : "", router]);
+  }, [routeGuard.kind, routeGuard.to, router]);
 
   useEffect(() => {
     if (room) return;

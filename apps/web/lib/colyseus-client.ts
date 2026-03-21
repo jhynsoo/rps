@@ -4,16 +4,16 @@ import {
   JOIN_ERROR_CODES,
   RECONNECT_STORAGE_KEY,
   RECONNECT_TOKEN_TTL_MS,
-  TRANSPORT_ERROR_CODES,
   type ReconnectSnapshot,
+  TRANSPORT_ERROR_CODES,
 } from "@rps/contracts";
 import { Client, type Room } from "colyseus.js";
 
 import {
-  LEGACY_ERROR_CODES,
-  WEB_COMPAT_ERROR_CODES,
   type CompatErrorCode,
   type ErrorEnvelope,
+  LEGACY_ERROR_CODES,
+  WEB_COMPAT_ERROR_CODES,
 } from "@/lib/error-contract";
 
 type NicknameOptions = {
@@ -172,7 +172,10 @@ function mapDeterministicErrorCode(
 
   // Legacy textual fallbacks for compatibility with non-coded errors.
   if (boundary === "join") {
-    if (parts.normalizedMessage.includes("maxclients") || parts.normalizedMessage.includes("full")) {
+    if (
+      parts.normalizedMessage.includes("maxclients") ||
+      parts.normalizedMessage.includes("full")
+    ) {
       return LEGACY_ERROR_CODES.ROOM_FULL;
     }
     if (parts.normalizedMessage.includes("not found")) {
@@ -184,7 +187,10 @@ function mapDeterministicErrorCode(
     if (parts.normalizedMessage.includes("expired")) {
       return LEGACY_ERROR_CODES.RECONNECT_TOKEN_EXPIRED;
     }
-    if (parts.normalizedMessage.includes("invalid") || parts.normalizedMessage.includes("malformed")) {
+    if (
+      parts.normalizedMessage.includes("invalid") ||
+      parts.normalizedMessage.includes("malformed")
+    ) {
       return LEGACY_ERROR_CODES.RECONNECT_TOKEN_INVALID;
     }
   }

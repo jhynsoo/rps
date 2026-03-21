@@ -1,11 +1,11 @@
 import {
   ACTION_ERROR_CODES,
+  type ErrorCode as ContractErrorCode,
+  type ErrorEnvelope as ContractErrorEnvelope,
+  type ErrorBoundary,
   JOIN_ERROR_CODES,
   NORMALIZED_ERROR_CODES,
   TRANSPORT_ERROR_CODES,
-  type ErrorBoundary,
-  type ErrorCode as ContractErrorCode,
-  type ErrorEnvelope as ContractErrorEnvelope,
 } from "@rps/contracts";
 
 export const LEGACY_ERROR_CODES = {
@@ -22,7 +22,10 @@ export const WEB_COMPAT_ERROR_CODES = {
 } as const;
 
 export type LegacyErrorCode = (typeof LEGACY_ERROR_CODES)[keyof typeof LEGACY_ERROR_CODES];
-export type CompatErrorCode = ContractErrorCode | LegacyErrorCode | (typeof WEB_COMPAT_ERROR_CODES.UNKNOWN);
+export type CompatErrorCode =
+  | ContractErrorCode
+  | LegacyErrorCode
+  | typeof WEB_COMPAT_ERROR_CODES.UNKNOWN;
 
 export type ErrorEnvelope = Omit<ContractErrorEnvelope, "code"> & {
   code: CompatErrorCode;

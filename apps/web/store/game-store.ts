@@ -1,8 +1,8 @@
 "use client";
 
+import { SERVER_MESSAGE_TYPES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import type { Room } from "colyseus.js";
 import { create } from "zustand";
-import { SERVER_MESSAGE_TYPES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import {
   clearReconnectSnapshot,
   createReconnectSnapshot,
@@ -13,9 +13,9 @@ import {
   reconnectRoom,
 } from "@/lib/colyseus-client";
 import {
-  WEB_COMPAT_ERROR_CODES,
   coerceErrorEnvelope,
   type ErrorEnvelope,
+  WEB_COMPAT_ERROR_CODES,
 } from "@/lib/error-contract";
 import { safeLeave } from "@/lib/safe-leave";
 

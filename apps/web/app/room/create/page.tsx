@@ -1,7 +1,7 @@
 "use client";
 
-import type { Room } from "colyseus.js";
 import { TRANSPORT_ERROR_CODES } from "@rps/contracts";
+import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";

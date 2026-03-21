@@ -5,10 +5,10 @@ import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
-import type { RpsChoice } from "@/lib/rps";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
-import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import type { RpsChoice } from "@/lib/rps";
+import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -99,7 +99,7 @@ export default function GamePage() {
   useEffect(() => {
     if (routeGuard.kind !== "state_redirect") return;
     router.replace(routeGuard.to);
-  }, [routeGuard.kind, routeGuard.kind === "state_redirect" ? routeGuard.to : "", router]);
+  }, [routeGuard.kind, routeGuard.to, router]);
 
   useEffect(() => {
     if (room) return;
