@@ -101,7 +101,7 @@ export default function ResultPage() {
   useEffect(() => {
     if (routeGuard.kind !== "state_redirect") return;
     router.replace(routeGuard.to);
-  }, [routeGuard.kind, routeGuard.to, router]);
+  }, [routeGuard, router]);
 
   useEffect(() => {
     if (room) return;
