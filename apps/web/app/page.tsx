@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { MAX_NICKNAME_LENGTH, NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { readStoredNicknameResolution } from "@/lib/nickname-session";
 
 export default function Home() {
   const router = useRouter();
@@ -14,8 +15,8 @@ export default function Home() {
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
-    if (saved) setNickname(sanitizeNickname(saved));
+    const { nickname: savedNickname } = readStoredNicknameResolution();
+    if (savedNickname) setNickname(savedNickname);
   }, []);
 
   const validationMessage = useMemo(() => {

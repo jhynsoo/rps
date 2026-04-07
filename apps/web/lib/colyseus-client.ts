@@ -1,5 +1,6 @@
 "use client";
 
+import { find, pipe } from "@fxts/core";
 import {
   JOIN_ERROR_CODES,
   RECONNECT_STORAGE_KEY,
@@ -109,7 +110,12 @@ type ErrorParts = {
 };
 
 function hasHint(message: string, hints: readonly string[]) {
-  return hints.some((hint) => message.includes(hint));
+  return (
+    pipe(
+      hints,
+      find((hint) => message.includes(hint)),
+    ) !== undefined
+  );
 }
 
 function readErrorParts(error: unknown): ErrorParts {
@@ -254,22 +260,19 @@ export function readReconnectSnapshotStatus(
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!isReconnectSnapshot(parsed)) {
+    const status = !isReconnectSnapshot(parsed)
+      ? "invalid"
+      : parsed.roomId !== roomId
+        ? "mismatch"
+        : parsed.expiresAt <= Date.now()
+          ? "expired"
+          : "ok";
+
+    if (status !== "ok") {
       window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
-      return "invalid";
     }
 
-    if (parsed.roomId !== roomId) {
-      window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
-      return "mismatch";
-    }
-
-    if (parsed.expiresAt <= Date.now()) {
-      window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
-      return "expired";
-    }
-
-    return "ok";
+    return status;
   } catch {
     window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
     return "invalid";

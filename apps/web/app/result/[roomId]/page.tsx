@@ -1,61 +1,28 @@
 "use client";
 
 import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
+import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import {
+  countReadyPlayers,
+  findOpponentBySessionId,
+  findPlayerBySessionId,
+  getRenderableRoomState,
+  materializePlayers,
+  resolveWinnerLabel,
+} from "@/lib/room-view";
 import { gameModeMessage, gameStatusMessage } from "@/lib/rps-i18n";
+import { useDelayedReconnectAttempt, useRouteGuardRedirect } from "@/lib/use-room-page-effects";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
-type PlayerLike = PlayerStateView;
 type MyRoomStateLike = Pick<
   RoomStateView,
   "players" | "gameStatus" | "gameMode" | "winner" | "roundNumber"
 >;
-type PlayersCollectionLike = {
-  size: number;
-  values: () => IterableIterator<PlayerLike>;
-};
-
-function getState(room: Room | null): MyRoomStateLike | null {
-  if (!room) return null;
-  return room.state as MyRoomStateLike;
-}
-
-function hasPlayersCollection(value: unknown): value is PlayersCollectionLike {
-  if (typeof value !== "object" || value === null) return false;
-  const maybe = value as { size?: unknown; values?: unknown };
-  return typeof maybe.size === "number" && typeof maybe.values === "function";
-}
-
-function getRenderableState(state: MyRoomStateLike | null): MyRoomStateLike | null {
-  if (!state) return null;
-  if (!hasPlayersCollection((state as { players?: unknown }).players)) return null;
-  return state;
-}
-
-type MessageDescriptor = {
-  key: string;
-  values?: Record<string, string | number>;
-};
-
-function translateMessage(
-  t: (key: string, values?: Record<string, string | number>) => string,
-  message: MessageDescriptor,
-) {
-  return message.values ? t(message.key, message.values) : t(message.key);
-}
-
-function getWinnerLabel(winner: string, players: PlayerLike[], drawLabel: string) {
-  if (!winner) return "";
-  if (winner === "draw") return drawLabel;
-  const p = players.find((x) => x.sessionId === winner);
-  return p?.nickname || winner.slice(0, 6);
-}
 
 export default function ResultPage() {
   const tGame = useTranslations("game");
@@ -76,7 +43,7 @@ export default function ResultPage() {
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   useRoomStateVersion(room);
 
-  const state = getRenderableState(getState(room));
+  const state = getRenderableRoomState<MyRoomStateLike>(room);
   const gameStatus = state?.gameStatus ?? "";
   const routeGuard = resolveRoomRouteGuard({
     page: "result",
@@ -89,35 +56,20 @@ export default function ResultPage() {
     reconnectError,
   });
 
-  const players = state ? Array.from(state.players.values()) : [];
-  const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
-  const opponent = room ? (players.find((p) => p.sessionId !== room.sessionId) ?? null) : null;
+  const players = materializePlayers<PlayerStateView>(state?.players);
+  const self = findPlayerBySessionId(players, room?.sessionId);
+  const opponent = findOpponentBySessionId(players, room?.sessionId);
 
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
 
-  const reconnectAttemptedRef = useRef(false);
-
-  useEffect(() => {
-    if (routeGuard.kind !== "state_redirect") return;
-    router.replace(routeGuard.to);
-  }, [routeGuard, router]);
-
-  useEffect(() => {
-    if (room) return;
-    if (!roomId) return;
-    if (routeGuard.kind === "mismatch") return;
-    if (reconnectAttemptedRef.current) return;
-
-    reconnectAttemptedRef.current = true;
-    const timer = window.setTimeout(() => {
-      void attemptReconnect(roomId);
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [attemptReconnect, room, roomId, routeGuard.kind]);
+  useRouteGuardRedirect(routeGuard, router.replace);
+  useDelayedReconnectAttempt({
+    room,
+    roomId,
+    routeGuardKind: routeGuard.kind,
+    attemptReconnect,
+  });
 
   async function onBackToMenu() {
     try {
@@ -190,9 +142,9 @@ export default function ResultPage() {
 
   const selfReady = self?.isReady ?? false;
   const opponentReady = opponent?.isReady ?? false;
-  const readyCount = players.filter((p) => p.isReady).length;
+  const readyCount = countReadyPlayers(players);
   const totalPlayers = state.players.size;
-  const winnerLabel = getWinnerLabel(state.winner, players, t("errors.draw"));
+  const winnerLabel = resolveWinnerLabel(state.winner, players, t("errors.draw"));
   const isFinished = gameStatus === "finished";
 
   return (

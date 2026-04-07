@@ -2,7 +2,7 @@
 
 import { SERVER_MESSAGE_TYPES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import type { Room } from "colyseus.js";
-import { create } from "zustand";
+import { create, type StoreApi } from "zustand";
 import {
   clearReconnectSnapshot,
   createReconnectSnapshot,
@@ -66,89 +66,146 @@ const leaveListenersAttached = new WeakSet<Room>();
 const pageHideHandlers = new WeakMap<Room, () => void>();
 const forceDisconnectHandlers = new WeakMap<Room, EventListener>();
 
-export const useGameStore = create<GameStoreState>((set, get) => ({
+type BaseRoomState = Pick<
+  GameStoreState,
+  "room" | "roomId" | "leaveError" | "reconnectState" | "reconnectError" | "lastErrorEnvelope"
+>;
+
+const idleRoomState = (): BaseRoomState => ({
   room: null,
   roomId: null,
   leaveError: null,
   reconnectState: "idle",
   reconnectError: null,
   lastErrorEnvelope: null,
-  setRoom: (room) => {
-    set({
-      room,
-      roomId: room.roomId,
-      leaveError: null,
-      reconnectError: null,
-      reconnectState: "idle",
-      lastErrorEnvelope: null,
-    });
-    clearReconnectSnapshot();
+});
 
-    const initialSnapshot = createReconnectSnapshot(room);
-    if (initialSnapshot) {
-      persistReconnectSnapshot(initialSnapshot);
-    }
+const attachedRoomState = (room: Room): BaseRoomState => ({
+  room,
+  roomId: room.roomId,
+  leaveError: null,
+  reconnectState: "idle",
+  reconnectError: null,
+  lastErrorEnvelope: null,
+});
+
+function persistSnapshotForRoom(room: Room) {
+  const snapshot = createReconnectSnapshot(room);
+  if (snapshot) {
+    persistReconnectSnapshot(snapshot);
+  }
+}
+
+function setLastErrorEnvelopeForRoom(
+  set: StoreApi<GameStoreState>["setState"],
+  room: Room,
+  envelope: ErrorEnvelope,
+) {
+  set((state) => {
+    if (state.room !== room) return state;
+    return { ...state, lastErrorEnvelope: envelope };
+  });
+}
+
+function resolveTransportErrorCode(rawCode: number): ErrorEnvelope["code"] {
+  if (rawCode === 4214) {
+    return TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED;
+  }
+
+  return WEB_COMPAT_ERROR_CODES.UNKNOWN;
+}
+
+function buildTransportErrorEnvelope(code: number, message: string | undefined): ErrorEnvelope {
+  const normalizedMessage = message ?? "";
+
+  return {
+    boundary: "transport",
+    code: resolveTransportErrorCode(code),
+    message: normalizedMessage,
+    rawCode: code,
+    rawMessage: normalizedMessage,
+  };
+}
+
+function detachWindowLeaveHandlers(room: Room | null) {
+  if (typeof window === "undefined" || !room) return;
+
+  const pageHideHandler = pageHideHandlers.get(room);
+  const forceDisconnectHandler = forceDisconnectHandlers.get(room);
+
+  if (pageHideHandler) {
+    window.removeEventListener("pagehide", pageHideHandler);
+    pageHideHandlers.delete(room);
+  }
+
+  if (forceDisconnectHandler) {
+    window.removeEventListener("rps:force-disconnect", forceDisconnectHandler);
+    forceDisconnectHandlers.delete(room);
+  }
+}
+
+function attachWindowLeaveHandlers(room: Room) {
+  if (typeof window === "undefined") return;
+
+  const pageHideHandler = () => {
+    void safeLeave(room, false);
+  };
+  const forceDisconnectHandler: EventListener = () => {
+    void safeLeave(room, false);
+  };
+
+  pageHideHandlers.set(room, pageHideHandler);
+  forceDisconnectHandlers.set(room, forceDisconnectHandler);
+  window.addEventListener("pagehide", pageHideHandler, { once: true });
+  window.addEventListener("rps:force-disconnect", forceDisconnectHandler);
+}
+
+function resolveReconnectFailureState(
+  reconnectError: GameStoreState["reconnectError"],
+): Partial<GameStoreState> {
+  return {
+    reconnectState: "failed",
+    reconnectError,
+    leaveError: leaveErrorDisconnected,
+    room: null,
+    roomId: null,
+  };
+}
+
+function resolveReconnectError(
+  status: ReturnType<typeof readReconnectSnapshotStatus>,
+  normalizedCode?: ErrorEnvelope["code"],
+): GameStoreState["reconnectError"] {
+  if (status === "expired" || normalizedCode === TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED) {
+    return "expired";
+  }
+
+  return normalizedCode ? "network" : null;
+}
+
+export const useGameStore = create<GameStoreState>((set, get) => ({
+  ...idleRoomState(),
+  setRoom: (room) => {
+    set(attachedRoomState(room));
+    clearReconnectSnapshot();
+    persistSnapshotForRoom(room);
 
     if (leaveListenersAttached.has(room)) return;
     leaveListenersAttached.add(room);
 
     room.onMessage(SERVER_MESSAGE_TYPES.ERROR, (payload: unknown) => {
-      const envelope = coerceErrorEnvelope(payload);
-      set((s) => {
-        if (s.room !== room) return s;
-        return { ...s, lastErrorEnvelope: envelope };
-      });
+      setLastErrorEnvelopeForRoom(set, room, coerceErrorEnvelope(payload));
     });
 
     room.onError((code, message) => {
-      const normalizedMessage = message ?? "";
-      const envelope: ErrorEnvelope = {
-        boundary: "transport",
-        code:
-          code === 4214 ? TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED : WEB_COMPAT_ERROR_CODES.UNKNOWN,
-        message: normalizedMessage,
-        rawCode: code,
-        rawMessage: normalizedMessage,
-      };
-
-      set((s) => {
-        if (s.room !== room) return s;
-        return { ...s, lastErrorEnvelope: envelope };
-      });
+      setLastErrorEnvelopeForRoom(set, room, buildTransportErrorEnvelope(code, message));
     });
 
-    if (typeof window !== "undefined") {
-      const pageHideHandler = () => {
-        void safeLeave(room, false);
-      };
-      const forceDisconnectHandler: EventListener = () => {
-        void safeLeave(room, false);
-      };
-
-      pageHideHandlers.set(room, pageHideHandler);
-      forceDisconnectHandlers.set(room, forceDisconnectHandler);
-      window.addEventListener("pagehide", pageHideHandler, { once: true });
-      window.addEventListener("rps:force-disconnect", forceDisconnectHandler);
-    }
+    attachWindowLeaveHandlers(room);
 
     room.onLeave(() => {
-      if (typeof window !== "undefined") {
-        const pageHideHandler = pageHideHandlers.get(room);
-        const forceDisconnectHandler = forceDisconnectHandlers.get(room);
-        if (pageHideHandler) {
-          window.removeEventListener("pagehide", pageHideHandler);
-          pageHideHandlers.delete(room);
-        }
-        if (forceDisconnectHandler) {
-          window.removeEventListener("rps:force-disconnect", forceDisconnectHandler);
-          forceDisconnectHandlers.delete(room);
-        }
-      }
-
-      const snapshot = createReconnectSnapshot(room);
-      if (snapshot) {
-        persistReconnectSnapshot(snapshot);
-      }
+      detachWindowLeaveHandlers(room);
+      persistSnapshotForRoom(room);
 
       set((s) => {
         if (s.room !== room) return s;
@@ -157,38 +214,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     });
   },
   clearRoom: () => {
-    set({
-      room: null,
-      roomId: null,
-      leaveError: null,
-      reconnectState: "idle",
-      reconnectError: null,
-      lastErrorEnvelope: null,
-    });
+    set(idleRoomState());
   },
   leaveRoom: async () => {
     const current = get().room;
-    if (typeof window !== "undefined" && current) {
-      const pageHideHandler = pageHideHandlers.get(current);
-      const forceDisconnectHandler = forceDisconnectHandlers.get(current);
-      if (pageHideHandler) {
-        window.removeEventListener("pagehide", pageHideHandler);
-        pageHideHandlers.delete(current);
-      }
-      if (forceDisconnectHandler) {
-        window.removeEventListener("rps:force-disconnect", forceDisconnectHandler);
-        forceDisconnectHandlers.delete(current);
-      }
-    }
+    detachWindowLeaveHandlers(current);
     clearReconnectSnapshot();
-    set({
-      room: null,
-      roomId: null,
-      leaveError: null,
-      reconnectState: "idle",
-      reconnectError: null,
-      lastErrorEnvelope: null,
-    });
+    set(idleRoomState());
     await safeLeave(current);
   },
   attemptReconnect: async (roomId) => {
@@ -197,13 +229,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const snapshotStatus = readReconnectSnapshotStatus(roomId);
     const snapshot = readReconnectSnapshot(roomId);
     if (!snapshot) {
-      set({
-        reconnectState: "failed",
-        reconnectError: snapshotStatus === "expired" ? "expired" : null,
-        leaveError: leaveErrorDisconnected,
-        room: null,
-        roomId: null,
-      });
+      set(resolveReconnectFailureState(resolveReconnectError(snapshotStatus)));
       return false;
     }
 
@@ -211,10 +237,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const room = await reconnectRoom(snapshot.token);
       get().setRoom(room);
 
-      const refreshedSnapshot = createReconnectSnapshot(room);
-      if (refreshedSnapshot) {
-        persistReconnectSnapshot(refreshedSnapshot);
-      }
+      persistSnapshotForRoom(room);
 
       set({ reconnectState: "succeeded", reconnectError: null });
 
@@ -222,16 +245,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     } catch (error) {
       clearReconnectSnapshot();
       const normalized = normalizeColyseusError(error, "reconnect");
-      const reconnectError =
-        normalized.code === TRANSPORT_ERROR_CODES.RECONNECT_EXPIRED ? "expired" : "network";
-
-      set({
-        reconnectState: "failed",
-        reconnectError,
-        leaveError: leaveErrorDisconnected,
-        room: null,
-        roomId: null,
-      });
+      set(resolveReconnectFailureState(resolveReconnectError("ok", normalized.code)));
       return false;
     }
   },

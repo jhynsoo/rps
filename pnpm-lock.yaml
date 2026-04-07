@@ -75,6 +75,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fxts/core':
+        specifier: ^1.26.0
+        version: 1.26.0
       '@rps/contracts':
         specifier: workspace:*
         version: link:../../packages/rps-contracts
@@ -609,6 +612,9 @@ packages:
 
   '@formatjs/intl-localematcher@0.8.1':
     resolution: {integrity: sha512-xwEuwQFdtSq1UKtQnyTZWC+eHdv7Uygoa+H2k/9uzBVQjDyp9r20LNDNKedWXll7FssT3GRHvqsdJGYSUWqYFA==}
+
+  '@fxts/core@1.26.0':
+    resolution: {integrity: sha512-ONaza1CGr8dLKmJ0HQgi0h4XuyDJMr0P70M7o/My/YeeRxuYoSANHjE2nSY7xO4WHgxUD5ojd5dpxlFOzAEJsA==}
 
   '@img/colour@1.0.0':
     resolution: {integrity: sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw==}
@@ -3390,6 +3396,10 @@ snapshots:
   '@formatjs/intl-localematcher@0.8.1':
     dependencies:
       '@formatjs/fast-memoize': 3.1.0
+      tslib: 2.8.1
+
+  '@fxts/core@1.26.0':
+    dependencies:
       tslib: 2.8.1
 
   '@img/colour@1.0.0':

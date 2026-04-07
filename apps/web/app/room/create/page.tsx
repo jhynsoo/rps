@@ -1,14 +1,14 @@
 "use client";
 
-import { TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { createRoom, normalizeColyseusError } from "@/lib/colyseus-client";
-import { LEGACY_ERROR_CODES } from "@/lib/error-contract";
-import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { createRoom } from "@/lib/colyseus-client";
+import { NICKNAME_STORAGE_KEY } from "@/lib/nickname";
+import { readStoredNicknameResolution } from "@/lib/nickname-session";
+import { resolveCreateRoomErrorKey } from "@/lib/room-errors";
 import { safeLeave } from "@/lib/safe-leave";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
@@ -44,16 +44,18 @@ export default function CreateRoomPage() {
   const playersCount = readPlayersCount(room);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
-    const cleaned = saved ? sanitizeNickname(saved) : "";
-
-    if (!cleaned) {
-      if (saved) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
+    const {
+      nickname: savedNickname,
+      shouldClear,
+      shouldRedirectHome,
+    } = readStoredNicknameResolution();
+    if (shouldRedirectHome) {
+      if (shouldClear) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
       router.replace("/");
       return;
     }
 
-    setNickname(cleaned);
+    setNickname(savedNickname);
   }, [router]);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function CreateRoomPage() {
         router.replace(`/room/${created.roomId}`);
       } catch (e) {
         if (!active) return;
-        setError(tGame(mapCreateErrorToKey(e) as never));
+        setError(tGame(resolveCreateRoomErrorKey(e) as never));
       }
     }
 
@@ -198,14 +200,4 @@ export default function CreateRoomPage() {
       </div>
     </main>
   );
-}
-function mapCreateErrorToKey(error: unknown) {
-  const normalized = normalizeColyseusError(error, "create");
-  if (
-    normalized.code === TRANSPORT_ERROR_CODES.CONNECTION_LOST ||
-    normalized.code === LEGACY_ERROR_CODES.SERVER_UNAVAILABLE
-  ) {
-    return "errors.serverUnavailable";
-  }
-  return "errors.createFailed";
 }

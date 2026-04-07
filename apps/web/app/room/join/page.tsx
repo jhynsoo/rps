@@ -1,13 +1,13 @@
 "use client";
-import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
 import type { Room } from "colyseus.js";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { joinRoomById, normalizeColyseusError } from "@/lib/colyseus-client";
-import { LEGACY_ERROR_CODES } from "@/lib/error-contract";
-import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { joinRoomById } from "@/lib/colyseus-client";
+import { NICKNAME_STORAGE_KEY } from "@/lib/nickname";
+import { readStoredNicknameResolution } from "@/lib/nickname-session";
+import { resolveJoinRoomErrorKey } from "@/lib/room-errors";
 import { safeLeave } from "@/lib/safe-leave";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -32,16 +32,18 @@ export default function JoinRoomPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
-    const cleaned = saved ? sanitizeNickname(saved) : "";
-
-    if (!cleaned) {
-      if (saved) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
+    const {
+      nickname: savedNickname,
+      shouldClear,
+      shouldRedirectHome,
+    } = readStoredNicknameResolution();
+    if (shouldRedirectHome) {
+      if (shouldClear) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
       router.replace("/");
       return;
     }
 
-    setNickname(cleaned);
+    setNickname(savedNickname);
   }, [router]);
 
   useEffect(() => {
@@ -60,24 +62,6 @@ export default function JoinRoomPage() {
     if (roomIdInput.trim().length === 0) return t("join.roomIdRequired");
     return null;
   }, [roomIdInput, touched, t]);
-
-  function mapJoinErrorToKey(e: unknown) {
-    const normalized = normalizeColyseusError(e, "join");
-    if (
-      normalized.code === JOIN_ERROR_CODES.ROOM_FULL ||
-      normalized.code === LEGACY_ERROR_CODES.ROOM_FULL
-    ) {
-      return "errors.roomFull";
-    }
-    if (
-      normalized.code === TRANSPORT_ERROR_CODES.CONNECTION_LOST ||
-      normalized.code === LEGACY_ERROR_CODES.SERVER_UNAVAILABLE
-    ) {
-      return "errors.serverUnavailable";
-    }
-    if (normalized.code === LEGACY_ERROR_CODES.ROOM_NOT_FOUND) return "errors.roomNotFound";
-    return "errors.joinFailed";
-  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -113,7 +97,7 @@ export default function JoinRoomPage() {
       transferredRef.current = true;
       router.replace(`/room/${joined.roomId}`);
     } catch (err) {
-      if (mountedRef.current) setError(tGame(mapJoinErrorToKey(err) as never));
+      if (mountedRef.current) setError(tGame(resolveJoinRoomErrorKey(err) as never));
     } finally {
       if (mountedRef.current) setJoining(false);
     }

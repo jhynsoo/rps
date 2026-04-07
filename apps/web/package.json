@@ -15,6 +15,7 @@
     "test:e2e:smoke": "playwright test e2e/two-player-flow.spec.ts e2e/error-contract-flow.spec.ts --trace off --grep '(create/join \\+ single mode full match|reconnect resume with token restores active game session|error contract: reconnect 없이 game 접근 시 joinUnavailable 표시)'"
   },
   "dependencies": {
+    "@fxts/core": "^1.26.0",
     "@rps/contracts": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

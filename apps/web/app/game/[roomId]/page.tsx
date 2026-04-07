@@ -1,55 +1,32 @@
 "use client";
 
 import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
+import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import {
+  buildScoreSummaries,
+  findPlayerBySessionId,
+  getRenderableRoomState,
+  materializePlayers,
+} from "@/lib/room-view";
 import type { RpsChoice } from "@/lib/rps";
 import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
+import {
+  useDelayedReconnectAttempt,
+  useOpponentLeftState,
+  useRouteGuardRedirect,
+} from "@/lib/use-room-page-effects";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
-type PlayerLike = PlayerStateView;
 type MyRoomStateLike = Pick<
   RoomStateView,
   "players" | "gameStatus" | "gameMode" | "countdown" | "winner" | "roundNumber"
 >;
-type PlayersCollectionLike = {
-  size: number;
-  values: () => IterableIterator<PlayerLike>;
-};
-
-function getState(room: Room | null): MyRoomStateLike | null {
-  if (!room) return null;
-  return room.state as MyRoomStateLike;
-}
-
-function hasPlayersCollection(value: unknown): value is PlayersCollectionLike {
-  if (typeof value !== "object" || value === null) return false;
-  const maybe = value as { size?: unknown; values?: unknown };
-  return typeof maybe.size === "number" && typeof maybe.values === "function";
-}
-
-function getRenderableState(state: MyRoomStateLike | null): MyRoomStateLike | null {
-  if (!state) return null;
-  if (!hasPlayersCollection((state as { players?: unknown }).players)) return null;
-  return state;
-}
-
-type MessageDescriptor = {
-  key: string;
-  values?: Record<string, string | number>;
-};
-
-function translateMessage(
-  t: (key: string, values?: Record<string, string | number>) => string,
-  message: MessageDescriptor,
-) {
-  return message.values ? t(message.key, message.values) : t(message.key);
-}
 
 export default function GamePage() {
   const tGame = useTranslations("game");
@@ -70,7 +47,7 @@ export default function GamePage() {
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   useRoomStateVersion(room);
 
-  const state = getRenderableState(getState(room));
+  const state = getRenderableRoomState<MyRoomStateLike>(room);
   const gameStatus = state?.gameStatus ?? "";
   const routeGuard = resolveRoomRouteGuard({
     page: "game",
@@ -83,54 +60,30 @@ export default function GamePage() {
     reconnectError,
   });
 
-  const players = state ? Array.from(state.players.values()) : [];
-  const self = room ? (players.find((p) => p.sessionId === room.sessionId) ?? null) : null;
+  const players = materializePlayers<PlayerStateView>(state?.players);
+  const self = findPlayerBySessionId(players, room?.sessionId);
+  const scoreSummaries = buildScoreSummaries(players, t("playerFallback"));
 
   const selfChoice = self?.choice ?? "";
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
 
   const [choiceSent, setChoiceSent] = useState<RpsChoice | null>(null);
-  const reconnectAttemptedRef = useRef(false);
+  const opponentLeft = useOpponentLeftState(state?.players.size ?? 0);
 
-  const hadTwoPlayersRef = useRef(false);
-  const [opponentLeft, setOpponentLeft] = useState(false);
-
-  useEffect(() => {
-    if (routeGuard.kind !== "state_redirect") return;
-    router.replace(routeGuard.to);
-  }, [routeGuard, router]);
-
-  useEffect(() => {
-    if (room) return;
-    if (!roomId) return;
-    if (routeGuard.kind === "mismatch") return;
-    if (reconnectAttemptedRef.current) return;
-
-    reconnectAttemptedRef.current = true;
-    const timer = window.setTimeout(() => {
-      void attemptReconnect(roomId);
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [attemptReconnect, room, roomId, routeGuard.kind]);
+  useRouteGuardRedirect(routeGuard, router.replace);
+  useDelayedReconnectAttempt({
+    room,
+    roomId,
+    routeGuardKind: routeGuard.kind,
+    attemptReconnect,
+  });
 
   useEffect(() => {
     if (gameStatus !== "choosing") return;
     if (selfChoice !== "") return;
     setChoiceSent(null);
   }, [gameStatus, selfChoice]);
-
-  useEffect(() => {
-    const size = state?.players.size ?? 0;
-    if (size === 2) {
-      hadTwoPlayersRef.current = true;
-      setOpponentLeft(false);
-    }
-    if (size === 1 && hadTwoPlayersRef.current) setOpponentLeft(true);
-  }, [state?.players?.size]);
 
   async function onBackToLobby() {
     try {
@@ -323,12 +276,15 @@ export default function GamePage() {
                 <div className="rounded-2xl border border-border bg-background/60 p-4">
                   <p className="text-xs font-medium text-muted-foreground">{t("scoreLabel")}</p>
                   <div className="mt-3 grid gap-2">
-                    {players.map((p) => (
-                      <div key={p.sessionId} className="flex items-center justify-between gap-3">
+                    {scoreSummaries.map((player) => (
+                      <div
+                        key={player.sessionId}
+                        className="flex items-center justify-between gap-3"
+                      >
                         <span className="min-w-0 truncate font-mono text-sm">
-                          {p.nickname || t("playerFallback")}
+                          {player.nickname}
                         </span>
-                        <span className="font-mono text-sm">{p.score}</span>
+                        <span className="font-mono text-sm">{player.score}</span>
                       </div>
                     ))}
                   </div>

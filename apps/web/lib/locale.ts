@@ -1,3 +1,5 @@
+import { find, pipe } from "@fxts/core";
+
 export const SUPPORTED_LOCALES = ["ko", "en"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -30,16 +32,13 @@ export const resolveLocale = (
   acceptLanguageHeader: string | undefined | null,
 ): Locale => {
   const fromCookie = normalizeLocale(cookieLocale);
-  if (fromCookie) {
-    return fromCookie;
-  }
-
-  if (acceptLanguageHeader) {
-    for (const part of acceptLanguageHeader.split(",")) {
-      const candidate = normalizeLocale(part);
-      if (candidate) return candidate;
-    }
-  }
-
-  return DEFAULT_LOCALE;
+  return (
+    fromCookie ??
+    pipe(
+      acceptLanguageHeader?.split(",") ?? [],
+      find((part) => normalizeLocale(part) !== undefined),
+      (part) => (part ? normalizeLocale(part) : undefined),
+    ) ??
+    DEFAULT_LOCALE
+  );
 };

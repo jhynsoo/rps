@@ -1,52 +1,28 @@
 "use client";
 
 import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
+import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import {
+  buildRoomPlayerSummaries,
+  getRenderableRoomState,
+  materializePlayers,
+} from "@/lib/room-view";
 import type { GameMode } from "@/lib/rps";
 import { gameStatusMessage } from "@/lib/rps-i18n";
+import {
+  useDelayedReconnectAttempt,
+  useOpponentLeftState,
+  useRouteGuardRedirect,
+} from "@/lib/use-room-page-effects";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
-type PlayerLike = PlayerStateView;
 type MyRoomStateLike = Pick<RoomStateView, "players" | "hostSessionId" | "gameStatus" | "gameMode">;
-type PlayersCollectionLike = {
-  size: number;
-  values: () => IterableIterator<PlayerLike>;
-};
-
-function getState(room: Room | null): MyRoomStateLike | null {
-  if (!room) return null;
-  return room.state as MyRoomStateLike;
-}
-
-function hasPlayersCollection(value: unknown): value is PlayersCollectionLike {
-  if (typeof value !== "object" || value === null) return false;
-  const maybe = value as { size?: unknown; values?: unknown };
-  return typeof maybe.size === "number" && typeof maybe.values === "function";
-}
-
-function getRenderableState(state: MyRoomStateLike | null): MyRoomStateLike | null {
-  if (!state) return null;
-  if (!hasPlayersCollection((state as { players?: unknown }).players)) return null;
-  return state;
-}
-
-type MessageDescriptor = {
-  key: string;
-  values?: Record<string, string | number>;
-};
-
-function translateMessage(
-  t: (key: string, values?: Record<string, string | number>) => string,
-  message: MessageDescriptor,
-) {
-  return message.values ? t(message.key, message.values) : t(message.key);
-}
 
 const MODES: Array<{ mode: GameMode; testId: string }> = [
   { mode: "single", testId: "mode-single" },
@@ -74,7 +50,7 @@ export default function RoomLobbyPage() {
   const leaveRoom = useGameStore((s) => s.leaveRoom);
   useRoomStateVersion(room);
 
-  const state = getRenderableState(getState(room));
+  const state = getRenderableRoomState<MyRoomStateLike>(room);
   const gameStatus = state?.gameStatus ?? "";
   const routeGuard = resolveRoomRouteGuard({
     page: "room",
@@ -87,7 +63,10 @@ export default function RoomLobbyPage() {
     reconnectError,
   });
 
-  const players = state ? Array.from(state.players.values()) : [];
+  const players = materializePlayers<PlayerStateView>(state?.players);
+  const playerSummaries = state
+    ? buildRoomPlayerSummaries(players, state.hostSessionId, tGame("playerFallback"))
+    : [];
   const isHost = !!room && !!state && room.sessionId === state.hostSessionId;
 
   const canSendRealtimeActions = !isActionBlockedByLeaveError("mode-select", leaveError);
@@ -99,40 +78,15 @@ export default function RoomLobbyPage() {
     !isActionBlockedByLeaveError("start-game", leaveError);
   const [selectedMode, setSelectedMode] = useState<GameMode>("single");
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  const reconnectAttemptedRef = useRef(false);
+  const opponentLeft = useOpponentLeftState(state?.players.size ?? 0);
 
-  const hadTwoPlayersRef = useRef(false);
-  const [opponentLeft, setOpponentLeft] = useState(false);
-
-  useEffect(() => {
-    const size = state?.players.size ?? 0;
-    if (size === 2) {
-      hadTwoPlayersRef.current = true;
-      setOpponentLeft(false);
-    }
-    if (size === 1 && hadTwoPlayersRef.current) setOpponentLeft(true);
-  }, [state?.players?.size]);
-
-  useEffect(() => {
-    if (routeGuard.kind !== "state_redirect") return;
-    router.replace(routeGuard.to);
-  }, [routeGuard, router]);
-
-  useEffect(() => {
-    if (room) return;
-    if (!roomId) return;
-    if (routeGuard.kind === "mismatch") return;
-    if (reconnectAttemptedRef.current) return;
-
-    reconnectAttemptedRef.current = true;
-    const timer = window.setTimeout(() => {
-      void attemptReconnect(roomId);
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [attemptReconnect, room, roomId, routeGuard.kind]);
+  useRouteGuardRedirect(routeGuard, router.replace);
+  useDelayedReconnectAttempt({
+    room,
+    roomId,
+    routeGuardKind: routeGuard.kind,
+    attemptReconnect,
+  });
 
   async function onBackToLobby() {
     try {
@@ -289,15 +243,12 @@ export default function RoomLobbyPage() {
                 data-testid="player-list"
                 className="mt-3 grid gap-2 rounded-2xl border border-border bg-background/60 p-4"
               >
-                {players.map((p) => {
-                  const isHostPlayer = p.sessionId === state.hostSessionId;
+                {playerSummaries.map((player) => {
                   return (
-                    <li key={p.sessionId} className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate font-mono text-sm">
-                        {p.nickname || tGame("playerFallback")}
-                      </span>
+                    <li key={player.sessionId} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate font-mono text-sm">{player.nickname}</span>
                       <span className="flex items-center gap-2">
-                        {isHostPlayer ? (
+                        {player.isHost ? (
                           <span
                             data-testid="host-badge"
                             className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground/80"
@@ -306,7 +257,7 @@ export default function RoomLobbyPage() {
                           </span>
                         ) : null}
                         <span className="text-xs text-muted-foreground">
-                          {p.sessionId.slice(0, 4)}
+                          {player.sessionIdLabel}
                         </span>
                       </span>
                     </li>

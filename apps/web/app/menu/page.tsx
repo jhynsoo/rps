@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
-import { NICKNAME_STORAGE_KEY, sanitizeNickname } from "@/lib/nickname";
+import { NICKNAME_STORAGE_KEY } from "@/lib/nickname";
+import { readStoredNicknameResolution } from "@/lib/nickname-session";
 
 export default function LobbyPage() {
   const router = useRouter();
@@ -12,16 +13,18 @@ export default function LobbyPage() {
   const [nickname, setNickname] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(NICKNAME_STORAGE_KEY);
-    const cleaned = saved ? sanitizeNickname(saved) : "";
-
-    if (!cleaned) {
-      if (saved) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
+    const {
+      nickname: savedNickname,
+      shouldClear,
+      shouldRedirectHome,
+    } = readStoredNicknameResolution();
+    if (shouldRedirectHome) {
+      if (shouldClear) window.localStorage.removeItem(NICKNAME_STORAGE_KEY);
       router.replace("/");
       return;
     }
 
-    setNickname(cleaned);
+    setNickname(savedNickname);
   }, [router]);
 
   const greeting = useMemo(() => {
