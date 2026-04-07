@@ -1,4 +1,4 @@
-import { find, pipe } from "@fxts/core";
+import { find, map, pipe } from "@fxts/core";
 
 export const SUPPORTED_LOCALES = ["ko", "en"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
@@ -36,8 +36,8 @@ export const resolveLocale = (
     fromCookie ??
     pipe(
       acceptLanguageHeader?.split(",") ?? [],
-      find((part) => normalizeLocale(part) !== undefined),
-      (part) => (part ? normalizeLocale(part) : undefined),
+      map(normalizeLocale),
+      find((locale) => locale !== undefined),
     ) ??
     DEFAULT_LOCALE
   );

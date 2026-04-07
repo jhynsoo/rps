@@ -1,4 +1,4 @@
-import { filter, find, map, pipe, toArray } from "@fxts/core";
+import { find, map, pipe, reduceLazy, toArray } from "@fxts/core";
 import type { PlayerStateView } from "@rps/contracts";
 import type { Room } from "colyseus.js";
 
@@ -81,9 +81,7 @@ export function countReadyPlayers<P extends Pick<PlayerLike, "isReady">>(
 ): number {
   return pipe(
     players,
-    filter((player) => player.isReady),
-    toArray,
-    (readyPlayers) => readyPlayers.length,
+    reduceLazy((count, player) => count + (player.isReady ? 1 : 0), 0),
   );
 }
 
