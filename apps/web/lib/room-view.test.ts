@@ -3,13 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildRoomPlayerSummaries,
-  buildScoreSummaries,
-  countReadyPlayers,
-  findOpponentBySessionId,
-  findPlayerBySessionId,
+  deriveGamePageView,
+  deriveResultPageView,
   getRenderableRoomState,
-  materializePlayers,
-  resolveWinnerLabel,
 } from "@/lib/room-view";
 
 const players = [
@@ -41,31 +37,38 @@ function createRoomWithPlayers() {
 }
 
 describe("room-view selectors", () => {
-  it("materializes renderable room state players", () => {
+  it("exposes renderable room state players", () => {
     const state = getRenderableRoomState<{ players: unknown }>(createRoomWithPlayers());
-    expect(materializePlayers(state?.players)).toEqual(players);
+    expect(state?.players.size).toBe(players.length);
   });
 
-  it("finds self and opponent by session id", () => {
-    expect(findPlayerBySessionId(players, "host-session")).toEqual(players[0]);
-    expect(findOpponentBySessionId(players, "host-session")).toEqual(players[1]);
+  it("derives game page view in a single pass", () => {
+    expect(deriveGamePageView(players, "host-session", "Player")).toEqual({
+      self: players[0],
+      scoreSummaries: [
+        { sessionId: "host-session", nickname: "Host", score: 2 },
+        { sessionId: "guest-session", nickname: "Player", score: 1 },
+      ],
+    });
   });
 
-  it("counts ready players", () => {
-    expect(countReadyPlayers(players)).toBe(1);
+  it("derives result page view for winners and draws", () => {
+    expect(deriveResultPageView(players, "host-session", "host-session", "Draw")).toEqual({
+      self: players[0],
+      opponent: players[1],
+      readyCount: 1,
+      winnerLabel: "Host",
+    });
+
+    expect(deriveResultPageView(players, "host-session", "draw", "Draw")).toEqual({
+      self: players[0],
+      opponent: players[1],
+      readyCount: 1,
+      winnerLabel: "Draw",
+    });
   });
 
-  it("resolves winner labels for players and draw", () => {
-    expect(resolveWinnerLabel("host-session", players, "Draw")).toBe("Host");
-    expect(resolveWinnerLabel("draw", players, "Draw")).toBe("Draw");
-  });
-
-  it("builds score and room player summaries", () => {
-    expect(buildScoreSummaries(players, "Player")).toEqual([
-      { sessionId: "host-session", nickname: "Host", score: 2 },
-      { sessionId: "guest-session", nickname: "Player", score: 1 },
-    ]);
-
+  it("builds room player summaries", () => {
     expect(buildRoomPlayerSummaries(players, "host-session", "Player")).toEqual([
       {
         sessionId: "host-session",

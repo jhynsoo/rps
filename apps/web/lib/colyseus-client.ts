@@ -1,6 +1,6 @@
 "use client";
 
-import { find, pipe } from "@fxts/core";
+import { pipe, some } from "@fxts/core";
 import {
   JOIN_ERROR_CODES,
   RECONNECT_STORAGE_KEY,
@@ -110,11 +110,9 @@ type ErrorParts = {
 };
 
 function hasHint(message: string, hints: readonly string[]) {
-  return (
-    pipe(
-      hints,
-      find((hint) => message.includes(hint)),
-    ) !== undefined
+  return pipe(
+    hints,
+    some((hint) => message.includes(hint)),
   );
 }
 

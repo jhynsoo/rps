@@ -7,12 +7,7 @@ import { useEffect, useState } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
-import {
-  buildScoreSummaries,
-  findPlayerBySessionId,
-  getRenderableRoomState,
-  materializePlayers,
-} from "@/lib/room-view";
+import { deriveGamePageView, getRenderableRoomState } from "@/lib/room-view";
 import type { RpsChoice } from "@/lib/rps";
 import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
 import {
@@ -60,9 +55,13 @@ export default function GamePage() {
     reconnectError,
   });
 
-  const players = materializePlayers<PlayerStateView>(state?.players);
-  const self = findPlayerBySessionId(players, room?.sessionId);
-  const scoreSummaries = buildScoreSummaries(players, t("playerFallback"));
+  const { self, scoreSummaries } = state
+    ? deriveGamePageView<PlayerStateView>(
+        state.players.values(),
+        room?.sessionId,
+        t("playerFallback"),
+      )
+    : { self: null, scoreSummaries: [] };
 
   const selfChoice = self?.choice ?? "";
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));

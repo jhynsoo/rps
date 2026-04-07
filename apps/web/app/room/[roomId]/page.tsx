@@ -1,17 +1,13 @@
 "use client";
 
-import { CLIENT_MESSAGE_TYPES, type PlayerStateView, type RoomStateView } from "@rps/contracts";
+import { CLIENT_MESSAGE_TYPES, type RoomStateView } from "@rps/contracts";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
-import {
-  buildRoomPlayerSummaries,
-  getRenderableRoomState,
-  materializePlayers,
-} from "@/lib/room-view";
+import { buildRoomPlayerSummaries, getRenderableRoomState } from "@/lib/room-view";
 import type { GameMode } from "@/lib/rps";
 import { gameStatusMessage } from "@/lib/rps-i18n";
 import {
@@ -63,9 +59,8 @@ export default function RoomLobbyPage() {
     reconnectError,
   });
 
-  const players = materializePlayers<PlayerStateView>(state?.players);
   const playerSummaries = state
-    ? buildRoomPlayerSummaries(players, state.hostSessionId, tGame("playerFallback"))
+    ? buildRoomPlayerSummaries(state.players.values(), state.hostSessionId, tGame("playerFallback"))
     : [];
   const isHost = !!room && !!state && room.sessionId === state.hostSessionId;
 

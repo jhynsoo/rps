@@ -6,14 +6,7 @@ import { useTranslations } from "next-intl";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { translateMessage } from "@/lib/message-descriptor";
 import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
-import {
-  countReadyPlayers,
-  findOpponentBySessionId,
-  findPlayerBySessionId,
-  getRenderableRoomState,
-  materializePlayers,
-  resolveWinnerLabel,
-} from "@/lib/room-view";
+import { deriveResultPageView, getRenderableRoomState } from "@/lib/room-view";
 import { gameModeMessage, gameStatusMessage } from "@/lib/rps-i18n";
 import { useDelayedReconnectAttempt, useRouteGuardRedirect } from "@/lib/use-room-page-effects";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
@@ -56,9 +49,14 @@ export default function ResultPage() {
     reconnectError,
   });
 
-  const players = materializePlayers<PlayerStateView>(state?.players);
-  const self = findPlayerBySessionId(players, room?.sessionId);
-  const opponent = findOpponentBySessionId(players, room?.sessionId);
+  const { self, opponent, readyCount, winnerLabel } = state
+    ? deriveResultPageView<PlayerStateView>(
+        state.players.values(),
+        room?.sessionId,
+        state.winner,
+        t("errors.draw"),
+      )
+    : { self: null, opponent: null, readyCount: 0, winnerLabel: "" };
 
   const gameStatusLabel = translateMessage(t, gameStatusMessage(gameStatus));
   const gameModeLabel = state ? translateMessage(t, gameModeMessage(state.gameMode)) : "";
@@ -142,9 +140,7 @@ export default function ResultPage() {
 
   const selfReady = self?.isReady ?? false;
   const opponentReady = opponent?.isReady ?? false;
-  const readyCount = countReadyPlayers(players);
   const totalPlayers = state.players.size;
-  const winnerLabel = resolveWinnerLabel(state.winner, players, t("errors.draw"));
   const isFinished = gameStatus === "finished";
 
   return (
