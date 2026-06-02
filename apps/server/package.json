@@ -8,17 +8,18 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx watch src/index.ts",
-    "start:once": "tsx src/index.ts",
+    "contracts:build": "pnpm --dir ../.. --filter @rps/contracts build",
+    "dev": "pnpm run contracts:build && tsx watch src/index.ts",
+    "start": "pnpm run contracts:build && tsx watch src/index.ts",
+    "start:once": "pnpm run contracts:build && tsx src/index.ts",
     "lint": "biome check",
     "lint:fix": "biome check --write",
-    "loadtest": "tsx loadtest/example.ts --room my_room --numClients 2",
-    "loadtest:ci": "tsx loadtest/ci.ts",
-    "build": "npm run clean && tsc",
+    "loadtest": "pnpm run contracts:build && tsx loadtest/example.ts --room my_room --numClients 2",
+    "loadtest:ci": "pnpm run contracts:build && tsx loadtest/ci.ts",
+    "build": "pnpm run contracts:build && npm run clean && tsc",
     "check-types": "tsc --noEmit",
     "clean": "rimraf build",
-    "test": "mocha -r tsx test/**_test.ts --exit --timeout 15000"
+    "test": "pnpm run contracts:build && mocha -r tsx test/**_test.ts --exit --timeout 15000"
   },
   "license": "UNLICENSED",
   "devDependencies": {

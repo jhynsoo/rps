@@ -3,16 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "contracts:build": "pnpm --dir ../.. --filter @rps/contracts build",
+    "dev": "pnpm run contracts:build && next dev",
+    "build": "pnpm run contracts:build && next build",
+    "start": "pnpm run contracts:build && next start",
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "check-types": "tsc --noEmit",
-    "test": "pnpm test:unit",
-    "test:unit": "vitest run",
-    "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test e2e/two-player-flow.spec.ts e2e/error-contract-flow.spec.ts --trace off --grep '(create/join \\+ single mode full match|reconnect resume with token restores active game session|error contract: reconnect 없이 game 접근 시 joinUnavailable 표시)'"
+    "test": "pnpm run contracts:build && pnpm test:unit",
+    "test:unit": "pnpm run contracts:build && vitest run",
+    "test:e2e": "pnpm run contracts:build && playwright test",
+    "test:e2e:smoke": "pnpm run contracts:build && playwright test e2e/two-player-flow.spec.ts e2e/error-contract-flow.spec.ts --trace off --grep '(create/join \\+ single mode full match|reconnect resume with token restores active game session|error contract: reconnect 없이 game 접근 시 joinUnavailable 표시)'"
   },
   "dependencies": {
     "@fxts/core": "^1.26.0",
