@@ -11,6 +11,7 @@ RUN apk add --no-cache git
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/package.json
 COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
+COPY packages/typescript-config/base.json ./packages/typescript-config/base.json
 COPY packages/rps-contracts/package.json ./packages/rps-contracts/package.json
 COPY packages/rps-contracts/tsconfig.json ./packages/rps-contracts/tsconfig.json
 COPY packages/rps-contracts/tsup.config.ts ./packages/rps-contracts/tsup.config.ts

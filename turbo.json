@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "$TURBO_ROOT$/packages/typescript-config/**/*.json"],
       "outputs": ["build/**", ".next/**", "!.next/cache/**", "dist/**"]
     },
     "lint": {
