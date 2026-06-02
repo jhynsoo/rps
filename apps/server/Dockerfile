@@ -12,12 +12,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/server/package.json ./apps/server/package.json
 COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
 COPY packages/rps-contracts/package.json ./packages/rps-contracts/package.json
-COPY packages/rps-contracts/index.cjs ./packages/rps-contracts/index.cjs
-COPY packages/rps-contracts/index.mjs ./packages/rps-contracts/index.mjs
-COPY packages/rps-contracts/index.d.ts ./packages/rps-contracts/index.d.ts
+COPY packages/rps-contracts/tsconfig.json ./packages/rps-contracts/tsconfig.json
+COPY packages/rps-contracts/tsup.config.ts ./packages/rps-contracts/tsup.config.ts
+COPY packages/rps-contracts/src ./packages/rps-contracts/src
 COPY apps/server/src ./apps/server/src
 
 RUN pnpm install --frozen-lockfile
+RUN pnpm -C packages/rps-contracts run build
 RUN pnpm -C apps/server run build
 
 FROM node:24-alpine AS runtime
