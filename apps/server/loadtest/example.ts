@@ -18,7 +18,7 @@ type LoadtestClient = {
   };
 };
 
-const { Client } = require("colyseus.js") as { Client: LoadtestClient };
+const { Client } = require("@colyseus/sdk") as { Client: LoadtestClient };
 
 type LoadtestOptions = {
   endpoint: string;

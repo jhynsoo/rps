@@ -1,6 +1,6 @@
 "use client";
 
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { createRoom } from "@/lib/colyseus-client";
 import { NICKNAME_STORAGE_KEY } from "@/lib/nickname";
 import { readStoredNicknameResolution } from "@/lib/nickname-session";
 import { resolveCreateRoomErrorKey } from "@/lib/room-errors";
+import { buildRoomRoutePath } from "@/lib/room-route-guard";
 import { safeLeave } from "@/lib/safe-leave";
 import { useRoomStateVersion } from "@/lib/use-room-state-version";
 import { useGameStore } from "@/store/game-store";
@@ -79,7 +80,7 @@ export default function CreateRoomPage() {
         setRoom(created);
 
         transferredRef.current = true;
-        router.replace(`/room/${created.roomId}`);
+        router.replace(buildRoomRoutePath("room", created.roomId));
       } catch (e) {
         if (!active) return;
         setError(tGame(resolveCreateRoomErrorKey(e) as never));
@@ -182,7 +183,7 @@ export default function CreateRoomPage() {
               onClick={() => {
                 if (!roomId) return;
                 transferredRef.current = true;
-                router.push(`/room/${roomId}`);
+                router.push(buildRoomRoutePath("room", roomId));
               }}
               className="mt-4 inline-flex h-12 w-full items-center justify-between rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

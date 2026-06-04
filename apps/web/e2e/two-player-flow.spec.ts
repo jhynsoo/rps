@@ -1,5 +1,5 @@
+import { Client as ColyseusClient } from "@colyseus/sdk";
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { Client as ColyseusClient } from "colyseus.js";
 
 const UI_TIMEOUT_MS = 10_000;
 const WS_TIMEOUT_MS = 15_000;
@@ -299,16 +299,16 @@ test("reconnect resume with token restores active game session", async ({ browse
 
     await expect
       .poll(
-        async () => session.pageA.evaluate(() => window.localStorage.getItem("rps:reconnect:v1")),
+        async () => session.pageA.evaluate(() => window.sessionStorage.getItem("rps:reconnect:v1")),
         { timeout: WS_TIMEOUT_MS },
       )
       .not.toBeNull();
 
     const reconnectSnapshot = await session.pageA.evaluate(() =>
-      window.localStorage.getItem("rps:reconnect:v1"),
+      window.sessionStorage.getItem("rps:reconnect:v1"),
     );
     if (!reconnectSnapshot) {
-      throw new Error("Reconnect snapshot missing from localStorage");
+      throw new Error("Reconnect snapshot missing from sessionStorage");
     }
 
     const parsedSnapshot = JSON.parse(reconnectSnapshot) as { token: string };
@@ -336,7 +336,7 @@ test("reconnect snapshot mismatch falls back to join-unavailable error", async (
   try {
     await page.goto("/");
     await page.evaluate((roomId) => {
-      window.localStorage.setItem(
+      window.sessionStorage.setItem(
         "rps:reconnect:v1",
         JSON.stringify({
           roomId: `${roomId}-other`,

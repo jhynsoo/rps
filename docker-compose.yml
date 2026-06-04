@@ -7,6 +7,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 2567
+      MATCHMAKER_ALLOWED_ORIGINS: ${MATCHMAKER_ALLOWED_ORIGINS:?Set MATCHMAKER_ALLOWED_ORIGINS to the public web origin allowlist}
+      MONITOR_USERNAME: ${MONITOR_USERNAME:-}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD:-}
     expose:
       - "2567"
     networks:

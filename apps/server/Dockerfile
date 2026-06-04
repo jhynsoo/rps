@@ -28,11 +28,13 @@ WORKDIR /app/apps/server
 ENV NODE_ENV=production
 ENV PORT=2567
 
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/packages /app/packages
-COPY --from=build /app/apps/server/node_modules ./node_modules
-COPY --from=build /app/apps/server/build ./build
-COPY --from=build /app/apps/server/package.json ./package.json
+COPY --from=build --chown=node:node /app/node_modules /app/node_modules
+COPY --from=build --chown=node:node /app/packages /app/packages
+COPY --from=build --chown=node:node /app/apps/server/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/apps/server/build ./build
+COPY --from=build --chown=node:node /app/apps/server/package.json ./package.json
+
+USER node
 
 EXPOSE 2567
 

@@ -28,7 +28,7 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: "pnpm build && pnpm exec next start --port 3000",
+      command: "pnpm build && pnpm exec next start -p 3000",
       url: "http://127.0.0.1:3000",
       env: {
         NEXT_PUBLIC_COLYSEUS_URL: "ws://127.0.0.1:2567",

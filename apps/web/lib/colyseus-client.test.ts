@@ -1,6 +1,12 @@
-import { JOIN_ERROR_CODES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
-import { describe, expect, it } from "vitest";
-import { normalizeColyseusError } from "@/lib/colyseus-client";
+import { JOIN_ERROR_CODES, RECONNECT_STORAGE_KEY, TRANSPORT_ERROR_CODES } from "@rps/contracts";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  clearReconnectSnapshot,
+  normalizeColyseusError,
+  persistReconnectSnapshot,
+  readReconnectSnapshot,
+  readReconnectSnapshotStatus,
+} from "@/lib/colyseus-client";
 import { LEGACY_ERROR_CODES, WEB_COMPAT_ERROR_CODES } from "@/lib/error-contract";
 
 describe("normalizeColyseusError", () => {
@@ -58,5 +64,48 @@ describe("normalizeColyseusError", () => {
   it("returns unknown for unmatched errors", () => {
     const normalized = normalizeColyseusError(new Error("unexpected failure"), "create");
     expect(normalized.code).toBe(WEB_COMPAT_ERROR_CODES.UNKNOWN);
+  });
+});
+
+describe("reconnect snapshot storage", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it("stores reconnect snapshots in sessionStorage instead of localStorage", () => {
+    const snapshot = {
+      roomId: "room-secure",
+      token: "room-secure:token",
+      expiresAt: Date.now() + 1000,
+    };
+
+    persistReconnectSnapshot(snapshot);
+
+    expect(window.sessionStorage.getItem(RECONNECT_STORAGE_KEY)).toBe(JSON.stringify(snapshot));
+    expect(window.localStorage.getItem(RECONNECT_STORAGE_KEY)).toBeNull();
+    expect(readReconnectSnapshot("room-secure")).toEqual(snapshot);
+  });
+
+  it("clears invalid reconnect snapshots from sessionStorage", () => {
+    window.sessionStorage.setItem(RECONNECT_STORAGE_KEY, JSON.stringify({ roomId: "room-secure" }));
+
+    expect(readReconnectSnapshotStatus("room-secure")).toBe("invalid");
+    expect(window.sessionStorage.getItem(RECONNECT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("clears reconnect snapshots from sessionStorage", () => {
+    window.sessionStorage.setItem(
+      RECONNECT_STORAGE_KEY,
+      JSON.stringify({
+        roomId: "room-secure",
+        token: "room-secure:token",
+        expiresAt: Date.now() + 1000,
+      }),
+    );
+
+    clearReconnectSnapshot();
+
+    expect(window.sessionStorage.getItem(RECONNECT_STORAGE_KEY)).toBeNull();
   });
 });

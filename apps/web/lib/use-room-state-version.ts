@@ -1,6 +1,6 @@
 "use client";
 
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 import { useEffect, useState } from "react";
 
 export function useRoomStateVersion(room: Room | null): number {

@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import type { Room } from "@colyseus/sdk";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import {
   ACTION_ERROR_CODES,
@@ -6,7 +7,6 @@ import {
   type ErrorEnvelope,
   SERVER_MESSAGE_TYPES,
 } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 
 import appConfig from "../src/app.config";
 import { resolveTestPort } from "./testPort";

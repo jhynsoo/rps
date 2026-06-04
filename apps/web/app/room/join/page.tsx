@@ -1,5 +1,5 @@
 "use client";
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { joinRoomById } from "@/lib/colyseus-client";
 import { NICKNAME_STORAGE_KEY } from "@/lib/nickname";
 import { readStoredNicknameResolution } from "@/lib/nickname-session";
 import { resolveJoinRoomErrorKey } from "@/lib/room-errors";
+import { buildRoomRoutePath } from "@/lib/room-route-guard";
 import { safeLeave } from "@/lib/safe-leave";
 import { isActionBlockedByLeaveError, useGameStore } from "@/store/game-store";
 
@@ -95,7 +96,7 @@ export default function JoinRoomPage() {
       setRoom(joined);
 
       transferredRef.current = true;
-      router.replace(`/room/${joined.roomId}`);
+      router.replace(buildRoomRoutePath("room", joined.roomId));
     } catch (err) {
       if (mountedRef.current) setError(tGame(resolveJoinRoomErrorKey(err) as never));
     } finally {

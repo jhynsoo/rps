@@ -15,7 +15,13 @@ const RECONNECTABLE_GAME_STATUSES = new Set<string>([
 export function sanitizeNickname(value: unknown): string {
   if (typeof value !== "string") return "Player";
 
-  const trimmed = value.trim();
+  const trimmed = value
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
+    .replace(/\p{Cc}+/gu, " ")
+    .replace(/[^\p{L}\p{N} _.-]+/gu, "")
+    .trim()
+    .replace(/\s+/g, " ");
   if (trimmed.length === 0) return "Player";
 
   return trimmed.slice(0, 12);

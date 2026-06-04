@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { resolveContractErrorMessageKey } from "@/lib/error-contract";
 import { translateMessage } from "@/lib/message-descriptor";
-import { resolveRoomRouteGuard } from "@/lib/room-route-guard";
+import { buildRoomRoutePath, resolveRoomRouteGuard } from "@/lib/room-route-guard";
 import { deriveGamePageView, getRenderableRoomState } from "@/lib/room-view";
 import type { RpsChoice } from "@/lib/rps";
 import { gameModeMessage, gameStatusMessage, rpsChoiceMessage } from "@/lib/rps-i18n";
@@ -196,7 +196,7 @@ export default function GamePage() {
               <button
                 type="button"
                 data-testid="back-to-room"
-                onClick={() => router.push(`/room/${roomId}`)}
+                onClick={() => router.push(buildRoomRoutePath("room", roomId))}
                 className="h-9 rounded-xl border border-border bg-background/60 px-3 text-xs font-medium text-foreground/80 shadow-sm transition hover:bg-background"
               >
                 {t("backToRoom")}

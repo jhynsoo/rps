@@ -1,4 +1,4 @@
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 
 export async function safeLeave(room: Room | null | undefined, consented?: boolean): Promise<void> {
   if (!room) return;

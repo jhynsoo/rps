@@ -120,6 +120,21 @@ describe("resolveRoomRouteGuard", () => {
     ).toEqual({ kind: "state_redirect", to: "/room/abc" });
   });
 
+  it("encodes room ids when building state redirect paths", () => {
+    const result = resolveRoomRouteGuard({
+      page: "room",
+      roomId: "abc/../x?y",
+      room: {} as never,
+      storeRoomId: "abc/../x?y",
+      hasRenderableState: true,
+      gameStatus: "choosing",
+      reconnectState: "idle",
+      reconnectError: null,
+    });
+
+    expect(result).toEqual({ kind: "state_redirect", to: "/game/abc%2F..%2Fx%3Fy" });
+  });
+
   it("returns ready when nothing blocks rendering", () => {
     const result = resolveRoomRouteGuard({
       page: "game",

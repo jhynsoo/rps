@@ -1,7 +1,9 @@
+import { timingSafeEqual } from "node:crypto";
+
+import { matchMaker } from "@colyseus/core";
 import { monitor } from "@colyseus/monitor";
-import { playground } from "@colyseus/playground";
 import config from "@colyseus/tools";
-import { matchMaker } from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
 import type { RequestHandler } from "express";
 
 import {
@@ -28,7 +30,29 @@ function parseAllowedOrigins(rawValue: string | undefined): string[] {
     .filter((origin) => origin.length > 0);
 }
 
-const allowedOrigins = parseAllowedOrigins(process.env.MATCHMAKER_ALLOWED_ORIGINS);
+export function resolveRequiredAllowedOrigins(
+  nodeEnv: string | undefined,
+  rawValue: string | undefined,
+): string[] {
+  const origins = parseAllowedOrigins(rawValue);
+
+  if (nodeEnv === "production" && origins.length === 0) {
+    throw new Error(
+      "MATCHMAKER_ALLOWED_ORIGINS must be set in production to the public web origin allowlist.",
+    );
+  }
+
+  return origins;
+}
+
+const allowedOrigins = resolveRequiredAllowedOrigins(
+  process.env.NODE_ENV,
+  process.env.MATCHMAKER_ALLOWED_ORIGINS,
+);
+
+function resolveHeaderOrigin(headers: Headers): string | undefined {
+  return headers.get("origin") ?? undefined;
+}
 
 export function resolveAllowedOrigin(
   requestOrigin: string | undefined,
@@ -37,6 +61,49 @@ export function resolveAllowedOrigin(
   if (allowedOriginList.length === 0) return undefined;
   if (typeof requestOrigin !== "string") return undefined;
   return allowedOriginList.includes(requestOrigin) ? requestOrigin : undefined;
+}
+
+export function createMatchmakerCorsHeaders(
+  headers: Headers,
+  allowedOriginList: readonly string[],
+): Record<string, string> {
+  const allowedOrigin = resolveAllowedOrigin(resolveHeaderOrigin(headers), allowedOriginList);
+
+  return {
+    Vary: "Origin",
+    "Access-Control-Allow-Credentials": allowedOrigin ? "true" : "false",
+    "Access-Control-Allow-Origin": allowedOrigin ?? "null",
+  };
+}
+
+export function assertAllowedMatchmakerOrigin(
+  headers: Headers,
+  allowedOriginList: readonly string[],
+): void {
+  const requestOrigin = resolveHeaderOrigin(headers);
+  if (!requestOrigin) return;
+  if (resolveAllowedOrigin(requestOrigin, allowedOriginList)) return;
+
+  const error = new Error("Origin not allowed") as Error & { code?: number };
+  error.code = 403;
+  throw error;
+}
+
+type WebSocketVerifyInfo = {
+  origin: string;
+};
+
+type WebSocketVerifyCallback = (allowed: boolean, code?: number, message?: string) => void;
+
+export function createWebSocketVerifyClient(allowedOriginList: readonly string[]) {
+  return (info: WebSocketVerifyInfo, done: WebSocketVerifyCallback): void => {
+    if (!info.origin || resolveAllowedOrigin(info.origin, allowedOriginList)) {
+      done(true);
+      return;
+    }
+
+    done(false, 403, "Origin not allowed");
+  };
 }
 
 export function isProductionMonitorEnabled(
@@ -99,11 +166,23 @@ function decodeBasicAuthorizationHeader(value: string | undefined): {
   }
 }
 
+function isConstantTimeMatch(value: string, expected: string): boolean {
+  const valueBuffer = Buffer.from(value);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (valueBuffer.length !== expectedBuffer.length) return false;
+  return timingSafeEqual(valueBuffer, expectedBuffer);
+}
+
 function createMonitorAuthMiddleware(username: string, password: string): RequestHandler {
   return (req, res, next) => {
     const credentials = decodeBasicAuthorizationHeader(req.headers.authorization);
 
-    if (credentials?.username === username && credentials.password === password) {
+    if (
+      credentials &&
+      isConstantTimeMatch(credentials.username, username) &&
+      isConstantTimeMatch(credentials.password, password)
+    ) {
       next();
       return;
     }
@@ -113,25 +192,59 @@ function createMonitorAuthMiddleware(username: string, password: string): Reques
   };
 }
 
-if (allowedOrigins.length > 0) {
-  matchMaker.controller.getCorsHeaders = (request) => {
-    const originHeader = request.headers.origin;
+function createAllowedOriginMiddleware(allowedOriginList: readonly string[]): RequestHandler {
+  return (req, res, next) => {
+    const originHeader = req.headers.origin;
     const requestOrigin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
 
-    const allowedOrigin = resolveAllowedOrigin(requestOrigin, allowedOrigins);
-    const headers: Record<string, string> = {
-      Vary: "Origin",
-    };
-
-    if (allowedOrigin) {
-      headers["Access-Control-Allow-Origin"] = allowedOrigin;
+    if (!requestOrigin) {
+      next();
+      return;
     }
 
-    return headers;
+    const allowedOrigin = resolveAllowedOrigin(requestOrigin, allowedOriginList);
+    res.setHeader("Vary", "Origin");
+
+    if (!allowedOrigin) {
+      res.removeHeader("Access-Control-Allow-Origin");
+      res.removeHeader("Access-Control-Allow-Credentials");
+      res.status(403).send("Origin not allowed");
+      return;
+    }
+
+    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    next();
   };
 }
 
+function installMatchmakerOriginPolicy(allowedOriginList: readonly string[]): void {
+  if (allowedOriginList.length === 0) return;
+
+  matchMaker.controller.getCorsHeaders = (headers) => {
+    return createMatchmakerCorsHeaders(headers, allowedOriginList);
+  };
+
+  const invokeMethod = matchMaker.controller.invokeMethod.bind(matchMaker.controller);
+  matchMaker.controller.invokeMethod = (method, roomName, clientOptions, authOptions) => {
+    if (authOptions?.headers) {
+      assertAllowedMatchmakerOrigin(authOptions.headers, allowedOriginList);
+    }
+
+    return invokeMethod(method, roomName, clientOptions, authOptions);
+  };
+}
+
+installMatchmakerOriginPolicy(allowedOrigins);
+
 export default config({
+  initializeTransport: (transportOptions) =>
+    new WebSocketTransport({
+      ...transportOptions,
+      verifyClient:
+        allowedOrigins.length > 0 ? createWebSocketVerifyClient(allowedOrigins) : undefined,
+    }),
+
   initializeGameServer: (gameServer) => {
     /**
      * Define your room handlers:
@@ -144,30 +257,29 @@ export default config({
     myRoomHandler.on("leave", recordLeave);
   },
 
-  initializeExpress: (app) => {
+  initializeExpress: async (app) => {
+    const isProduction = process.env.NODE_ENV === "production";
+
+    if (isProduction) {
+      app.use(createAllowedOriginMiddleware(allowedOrigins));
+    }
+
     /**
      * Bind your custom express routes here:
      * Read more: https://expressjs.com/en/starter/basic-routing.html
      */
-    app.get("/hello_world", (_req, res) => {
-      res.send("It's time to kick ass and chew bubblegum!");
-    });
+    if (!isProduction) {
+      app.get("/hello_world", (_req, res) => {
+        res.send("It's time to kick ass and chew bubblegum!");
+      });
+    }
 
-    if (process.env.NODE_ENV !== "production") {
+    if (!isProduction) {
       app.get("/__debug/stats", (_req, res) => {
         res.json(snapshot({ includeMemory: true, includeHandleCount: true }));
       });
     }
 
-    /**
-     * Use @colyseus/playground
-     * (It is not recommended to expose this route in a production environment)
-     */
-    if (process.env.NODE_ENV !== "production") {
-      app.use("/", playground());
-    }
-
-    const isProduction = process.env.NODE_ENV === "production";
     const monitorCredentials = resolveMonitorCredentials(
       process.env.MONITOR_USERNAME,
       process.env.MONITOR_PASSWORD,

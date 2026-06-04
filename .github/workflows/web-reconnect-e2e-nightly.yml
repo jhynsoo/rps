@@ -5,6 +5,9 @@ on:
     - cron: '0 18 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   reconnect-e2e:
     name: Reconnect E2E suite

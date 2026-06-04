@@ -8,7 +8,7 @@ test("error contract: reconnect 없이 game 접근 시 joinUnavailable 표시", 
 
   await page.goto("/");
   await page.evaluate(() => {
-    window.localStorage.removeItem("rps:reconnect:v1");
+    window.sessionStorage.removeItem("rps:reconnect:v1");
   });
 
   await page.goto(`/game/${roomId}`);
@@ -24,7 +24,7 @@ test("error contract: 만료된 reconnect snapshot은 reconnectExpired로 노출
 
   await page.goto("/");
   await page.evaluate((targetRoomId) => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       "rps:reconnect:v1",
       JSON.stringify({
         roomId: targetRoomId,

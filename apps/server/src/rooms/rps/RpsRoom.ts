@@ -1,3 +1,4 @@
+import { type Client, type Delayed, Room } from "@colyseus/core";
 import {
   ACTION_ERROR_CODES,
   type ActionErrorCode,
@@ -6,7 +7,6 @@ import {
   RECONNECT_GRACE_SECONDS,
   SERVER_MESSAGE_TYPES,
 } from "@rps/contracts";
-import { type Client, type Delayed, Room } from "colyseus";
 
 import {
   areAllPlayersChosen,
@@ -39,7 +39,7 @@ import {
 } from "./domain/room-lifecycle";
 import { PlayerState, RpsRoomState } from "./schema/RpsRoomState";
 
-export class RpsRoom extends Room<RpsRoomState> {
+export class RpsRoom extends Room<{ state: RpsRoomState }> {
   maxClients = 2;
   private countdownInterval: Delayed | null = null;
   private resultTimeout: Delayed | null = null;
@@ -339,36 +339,46 @@ export class RpsRoom extends Room<RpsRoomState> {
     this.syncRoomLock();
   }
 
-  async onLeave(client: Client, consented: boolean): Promise<void> {
+  private pauseTimersForLeave(statusBeforeLeave: string): void {
+    this.stopResultTimeout();
+    if (statusBeforeLeave === CHOOSING_GAME_STATUS) {
+      this.stopCountdown();
+    }
+  }
+
+  private resumeTimersAfterReconnect(): void {
+    if (this.state.gameStatus === CHOOSING_GAME_STATUS) {
+      this.resumeChoosingCountdown();
+    } else if (this.state.gameStatus === RESULT_GAME_STATUS) {
+      this.scheduleResultTimeout();
+    } else {
+      this.syncRoomLock();
+    }
+  }
+
+  async onDrop(client: Client): Promise<void> {
     const canReconnect = shouldAllowGracefulReconnection({
-      consented,
+      consented: false,
       playerCount: this.state.players.size,
       gameStatus: this.state.gameStatus,
     });
     const statusBeforeLeave = this.state.gameStatus;
 
-    this.stopResultTimeout();
-    if (statusBeforeLeave === CHOOSING_GAME_STATUS) {
-      this.stopCountdown();
-    }
+    this.pauseTimersForLeave(statusBeforeLeave);
 
     if (canReconnect) {
       try {
         await this.allowReconnection(client, RECONNECT_GRACE_SECONDS);
-
-        if (this.state.gameStatus === CHOOSING_GAME_STATUS) {
-          this.resumeChoosingCountdown();
-        } else if (this.state.gameStatus === RESULT_GAME_STATUS) {
-          this.scheduleResultTimeout();
-        } else {
-          this.syncRoomLock();
-        }
-
+        this.resumeTimersAfterReconnect();
         return;
       } catch {
-        // reconnect timeout/invalid token -> finalize leave below
+        // reconnect timeout/invalid token -> final leave is handled by onLeave()
       }
     }
+  }
+
+  async onLeave(client: Client): Promise<void> {
+    this.pauseTimersForLeave(this.state.gameStatus);
 
     this.finalizePlayerLeave(client.sessionId);
   }

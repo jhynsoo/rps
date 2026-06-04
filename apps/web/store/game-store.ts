@@ -1,7 +1,7 @@
 "use client";
 
+import type { Room } from "@colyseus/sdk";
 import { SERVER_MESSAGE_TYPES, TRANSPORT_ERROR_CODES } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 import { create, type StoreApi } from "zustand";
 import {
   clearReconnectSnapshot,

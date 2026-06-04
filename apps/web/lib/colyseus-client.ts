@@ -1,5 +1,6 @@
 "use client";
 
+import { Client, type Room } from "@colyseus/sdk";
 import { pipe, some } from "@fxts/core";
 import {
   JOIN_ERROR_CODES,
@@ -8,7 +9,6 @@ import {
   type ReconnectSnapshot,
   TRANSPORT_ERROR_CODES,
 } from "@rps/contracts";
-import { Client, type Room } from "colyseus.js";
 
 import {
   type CompatErrorCode,
@@ -244,16 +244,26 @@ function isReconnectSnapshot(value: unknown): value is ReconnectSnapshot {
   );
 }
 
-export function persistReconnectSnapshot(snapshot: ReconnectSnapshot): void {
+function getReconnectStorage(): Storage {
   assertClientSide();
-  window.localStorage.setItem(RECONNECT_STORAGE_KEY, JSON.stringify(snapshot));
+  return window.sessionStorage;
+}
+
+function clearLegacyReconnectSnapshot(): void {
+  window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
+}
+
+export function persistReconnectSnapshot(snapshot: ReconnectSnapshot): void {
+  getReconnectStorage().setItem(RECONNECT_STORAGE_KEY, JSON.stringify(snapshot));
+  clearLegacyReconnectSnapshot();
 }
 
 export function readReconnectSnapshotStatus(
   roomId: string,
 ): "missing" | "invalid" | "expired" | "mismatch" | "ok" {
-  assertClientSide();
-  const raw = window.localStorage.getItem(RECONNECT_STORAGE_KEY);
+  const storage = getReconnectStorage();
+  const raw = storage.getItem(RECONNECT_STORAGE_KEY);
+  clearLegacyReconnectSnapshot();
   if (!raw) return "missing";
 
   try {
@@ -267,20 +277,19 @@ export function readReconnectSnapshotStatus(
           : "ok";
 
     if (status !== "ok") {
-      window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
+      storage.removeItem(RECONNECT_STORAGE_KEY);
     }
 
     return status;
   } catch {
-    window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
+    storage.removeItem(RECONNECT_STORAGE_KEY);
     return "invalid";
   }
 }
 
 export function readReconnectSnapshot(roomId: string): ReconnectSnapshot | null {
-  assertClientSide();
   if (readReconnectSnapshotStatus(roomId) !== "ok") return null;
-  const raw = window.localStorage.getItem(RECONNECT_STORAGE_KEY);
+  const raw = getReconnectStorage().getItem(RECONNECT_STORAGE_KEY);
   if (!raw) return null;
   return JSON.parse(raw) as ReconnectSnapshot;
 }
@@ -298,6 +307,6 @@ export function createReconnectSnapshot(room: Room): ReconnectSnapshot | null {
 }
 
 export function clearReconnectSnapshot(): void {
-  assertClientSide();
-  window.localStorage.removeItem(RECONNECT_STORAGE_KEY);
+  getReconnectStorage().removeItem(RECONNECT_STORAGE_KEY);
+  clearLegacyReconnectSnapshot();
 }

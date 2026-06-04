@@ -178,10 +178,10 @@ Provides two scenarios:
 
 ## Server Integration
 
-Use the `colyseus.js` client to connect to the Colyseus server.
+Use the `@colyseus/sdk` client to connect to the Colyseus server.
 
 ```typescript
-import { Client } from "colyseus.js";
+import { Client } from "@colyseus/sdk";
 
 const client = new Client("ws://localhost:2567");
 

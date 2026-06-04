@@ -1,6 +1,6 @@
+import type { Room } from "@colyseus/sdk";
 import { map, pipe, reduceLazy, toArray } from "@fxts/core";
 import type { PlayerStateView } from "@rps/contracts";
-import type { Room } from "colyseus.js";
 
 export type PlayerLike = Pick<PlayerStateView, "sessionId" | "nickname" | "isReady" | "score"> & {
   choice?: string;

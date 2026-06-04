@@ -135,6 +135,17 @@ describe("testing your Colyseus app", () => {
       assert.strictEqual(room.state.players.get(client2.sessionId)?.nickname, "123456789012");
     });
 
+    it("nickname removes unsafe punctuation and invisible/control characters", async () => {
+      const room = await colyseus.createRoom<MyRoomState>("my_room", {});
+
+      const client = await colyseus.connectTo(room, {
+        nickname: "  플레이어\t<red>\u200b\n",
+      });
+      await room.waitForNextPatch();
+
+      assert.strictEqual(room.state.players.get(client.sessionId)?.nickname, "플레이어 red");
+    });
+
     it("gameStatus changes to mode_select when 2 players join", async () => {
       const room = await colyseus.createRoom<MyRoomState>("my_room", {});
       const _client1 = await colyseus.connectTo(room);

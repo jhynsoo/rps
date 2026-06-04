@@ -1,4 +1,4 @@
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 
 export type RoomRoutePage = "room" | "game" | "result";
 export type RoomRouteReconnectState = "idle" | "trying" | "succeeded" | "failed";
@@ -36,23 +36,35 @@ type RoomRouteGuardInput = {
   reconnectError: RoomRouteReconnectError;
 };
 
+export function buildRoomRoutePath(page: RoomRoutePage, roomId: string): string {
+  return `/${page}/${encodeURIComponent(roomId)}`;
+}
+
 function stateRedirectPath(page: RoomRoutePage, roomId: string, gameStatus: string): string | null {
   if (!roomId) return null;
 
   if (page === "room") {
-    if (gameStatus === "choosing") return `/game/${roomId}`;
-    if (gameStatus === "result" || gameStatus === "finished") return `/result/${roomId}`;
+    if (gameStatus === "choosing") return buildRoomRoutePath("game", roomId);
+    if (gameStatus === "result" || gameStatus === "finished") {
+      return buildRoomRoutePath("result", roomId);
+    }
     return null;
   }
 
   if (page === "game") {
-    if (gameStatus === "waiting" || gameStatus === "mode_select") return `/room/${roomId}`;
-    if (gameStatus === "result" || gameStatus === "finished") return `/result/${roomId}`;
+    if (gameStatus === "waiting" || gameStatus === "mode_select") {
+      return buildRoomRoutePath("room", roomId);
+    }
+    if (gameStatus === "result" || gameStatus === "finished") {
+      return buildRoomRoutePath("result", roomId);
+    }
     return null;
   }
 
-  if (gameStatus === "waiting" || gameStatus === "mode_select") return `/room/${roomId}`;
-  if (gameStatus === "choosing") return `/game/${roomId}`;
+  if (gameStatus === "waiting" || gameStatus === "mode_select") {
+    return buildRoomRoutePath("room", roomId);
+  }
+  if (gameStatus === "choosing") return buildRoomRoutePath("game", roomId);
   return null;
 }
 

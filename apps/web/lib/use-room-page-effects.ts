@@ -1,6 +1,6 @@
 "use client";
 
-import type { Room } from "colyseus.js";
+import type { Room } from "@colyseus/sdk";
 import { useEffect, useRef, useState } from "react";
 
 import type { RoomRouteGuardResult } from "@/lib/room-route-guard";
